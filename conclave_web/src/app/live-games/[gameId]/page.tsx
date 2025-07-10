@@ -27,21 +27,22 @@ import {
 
 interface WebSocketMessage {
     type: string;
-    game_id?: string;
-    player_id?: string;
-    new_life?: number;
-    change_amount?: number;
+    gameId?: string;
+    playerId?: string;
+    newLife?: number;
+    changeAmount?: number;
     username?: string;
     player?: Player;
     players?: Player[];
     winner?: Player;
+    message?: string;
 }
 
 interface WebSocketSendMessage {
     action: string;
-    player_id?: string;
-    change_amount?: number;
-    game_id?: string;
+    playerId?: string;
+    changeAmount?: number;
+    clerkUserId?: string;
 }
 
 export default function LiveGamePage() {
@@ -143,9 +144,9 @@ export default function LiveGamePage() {
         console.log("Current gameState players before update:", gameState?.players);
 
         switch (message.type) {
-            case "life_update":
-                if (message.player_id && message.new_life !== undefined) {
-                    console.log(`🔄 Processing life update for player ${message.player_id}: ${message.new_life} (change: ${message.change_amount})`);
+            case "lifeUpdate":
+                if (message.playerId && message.newLife !== undefined) {
+                    console.log(`🔄 Processing life update for player ${message.playerId}: ${message.newLife} (change: ${message.changeAmount})`);
 
                     setGameState((prev) => {
                         if (!prev) {
@@ -158,11 +159,11 @@ export default function LiveGamePage() {
                         const updatedState = {
                             ...prev,
                             players: prev.players.map((p) => {
-                                if (p.id === message.player_id) {
-                                    console.log(`✅ Updating player ${p.position} (${p.id}) from ${p.current_life} to ${message.new_life}`);
+                                if (p.id === message.playerId) {
+                                    console.log(`✅ Updating player ${p.position} (${p.id}) from ${p.current_life} to ${message.newLife}`);
                                     return {
                                         ...p,
-                                        current_life: message.new_life!,
+                                        current_life: message.newLife!,
                                     };
                                 }
                                 return p;
@@ -173,19 +174,19 @@ export default function LiveGamePage() {
                         return updatedState;
                     });
 
-                    if (message.change_amount) {
+                    if (message.changeAmount) {
                         const changeText =
-                            message.change_amount > 0
-                                ? `+${message.change_amount}`
-                                : `${message.change_amount}`;
+                            message.changeAmount > 0
+                                ? `+${message.changeAmount}`
+                                : `${message.changeAmount}`;
                         toast.info(`Life updated: ${changeText}`);
                     }
                 } else {
-                    console.log("❌ Invalid life_update message:", message);
+                    console.log("❌ Invalid lifeUpdate message:", message);
                 }
                 break;
 
-            case "player_joined":
+            case "playerJoined":
                 if (message.player) {
                     setGameState((prev) => {
                         if (!prev) return prev;
@@ -205,20 +206,20 @@ export default function LiveGamePage() {
                 }
                 break;
 
-            case "player_left":
-                if (message.player_id) {
+            case "playerLeft":
+                if (message.playerId) {
                     setGameState((prev) => {
                         if (!prev) return prev;
                         return {
                             ...prev,
-                            players: prev.players.filter((p) => p.id !== message.player_id),
+                            players: prev.players.filter((p) => p.id !== message.playerId),
                         };
                     });
                     toast.info(`A player left the game`);
                 }
                 break;
 
-            case "game_ended":
+            case "gameEnded":
                 if (message.winner) {
                     setGameState((prev) => {
                         if (!prev) return prev;
@@ -238,6 +239,27 @@ export default function LiveGamePage() {
                 }
                 break;
 
+            case "gameStarted":
+                if (message.players) {
+                    console.log("📨 Received gameStarted message with players:", message.players);
+                    setGameState((prev) => {
+                        if (!prev) return prev;
+                        return {
+                            ...prev,
+                            players: message.players!.sort((a, b) => a.position - b.position),
+                        };
+                    });
+                }
+                break;
+
+            case "error":
+                if (message.message) {
+                    console.error("WebSocket error message:", message.message);
+                    toast.error(`Server error: ${message.message}`);
+                    setConnectionError(message.message);
+                }
+                break;
+
             default:
                 console.log("Unknown message type:", message.type);
         }
@@ -251,10 +273,9 @@ export default function LiveGamePage() {
 
         try {
             const messageData: WebSocketSendMessage = {
-                action: "update_life",
-                player_id: playerId,
-                change_amount: changeAmount,
-                game_id: gameId,
+                action: "updateLife",
+                playerId: playerId,
+                changeAmount: changeAmount,
             };
 
             console.log(`📤 Sending life change: ${changeAmount} for player ${playerId}`);
@@ -287,8 +308,7 @@ export default function LiveGamePage() {
         if (confirm("Are you sure you want to end this game?")) {
             try {
                 const messageData: WebSocketSendMessage = {
-                    action: "end_game",
-                    game_id: gameId,
+                    action: "endGame",
                 };
 
                 console.log(`📤 Sending end game request for game ${gameId}`);
