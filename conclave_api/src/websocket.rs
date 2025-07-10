@@ -215,29 +215,28 @@ async fn handle_websocket_message(text: &str, game_id: Uuid, state: &AppState) -
     let request: WebSocketRequest =
         serde_json::from_str(text).map_err(|_| ApiError::BadRequest("Invalid JSON".to_string()))?;
 
-    match request.action.as_str() {
-        "update_life" => handle_life_update(request, game_id, state).await,
-        "get_game_state" => handle_get_game_state(game_id, state).await,
-        _ => Err(ApiError::BadRequest(format!(
-            "Unknown action: {}",
-            request.action
-        ))),
+    match request {
+        WebSocketRequest::UpdateLife { player_id, change_amount } => {
+            handle_life_update(player_id, change_amount, game_id, state).await
+        }
+        WebSocketRequest::JoinGame { clerk_user_id } => {
+            handle_join_game(clerk_user_id, game_id, state).await
+        }
+        WebSocketRequest::LeaveGame { player_id } => {
+            handle_leave_game(player_id, game_id, state).await
+        }
+        WebSocketRequest::GetGameState => {
+            handle_get_game_state(game_id, state).await
+        }
     }
 }
 
 async fn handle_life_update(
-    request: WebSocketRequest,
+    player_id: Uuid,
+    change_amount: i32,
     game_id: Uuid,
     state: &AppState,
 ) -> Result<()> {
-    let player_id = request
-        .player_id
-        .ok_or_else(|| ApiError::BadRequest("player_id required".to_string()))?;
-
-    let change_amount = request
-        .change_amount
-        .ok_or_else(|| ApiError::BadRequest("change_amount required".to_string()))?;
-
     info!(
         "🎮 Processing life update for game {}, player {}, change {}",
         game_id, player_id, change_amount
@@ -271,6 +270,62 @@ async fn handle_life_update(
 
     Ok(())
 }
+
+async fn handle_join_game(
+    clerk_user_id: String,
+    game_id: Uuid,
+    state: &AppState,
+) -> Result<()> {
+    // Add user to game if not already present
+    let result = database::join_game(&state.db, game_id, &clerk_user_id).await;
+    
+    match result {
+        Ok(player) => {
+            info!("🎮 Player {} joined game {}", clerk_user_id, game_id);
+            
+            // Broadcast player joined message
+            let message = WebSocketMessage::PlayerJoined {
+                game_id,
+                player: player.clone(),
+            };
+            
+            state.broadcast_to_game(game_id, message);
+            Ok(())
+        }
+        Err(e) => {
+            error!("Failed to add player to game: {:?}", e);
+            Err(e)
+        }
+    }
+}
+
+async fn handle_leave_game(
+    player_id: Uuid,
+    game_id: Uuid,
+    state: &AppState,
+) -> Result<()> {
+    info!("🎮 Player {} leaving game {}", player_id, game_id);
+    
+    // Get player info to extract clerk_user_id
+    let players = database::get_players_in_game(&state.db, game_id).await?;
+    let player = players.iter().find(|p| p.id == player_id)
+        .ok_or(ApiError::PlayerNotFound)?;
+    
+    let clerk_user_id = &player.clerk_user_id;
+    
+    // Remove player from game
+    database::leave_game(&state.db, game_id, clerk_user_id).await?;
+    
+    // Broadcast player left message
+    let message = WebSocketMessage::PlayerLeft {
+        game_id,
+        player_id,
+    };
+    
+    state.broadcast_to_game(game_id, message);
+    
+    info!("📤 Player left broadcast completed for game {}", game_id);
+    Ok(())
 
 async fn handle_get_game_state(game_id: Uuid, state: &AppState) -> Result<()> {
     let game_state = database::get_game_state(&state.db, game_id).await?;

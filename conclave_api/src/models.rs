@@ -87,35 +87,68 @@ pub struct GameWithUsers {
 
 // WebSocket Message Types
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type")]
+#[serde(tag = "type", rename_all = "camelCase")]
 pub enum WebSocketMessage {
-    #[serde(rename = "life_update")]
+    #[serde(rename = "lifeUpdate")]
     LifeUpdate {
         game_id: Uuid,
         player_id: Uuid,
         new_life: i32,
         change_amount: i32,
     },
-    #[serde(rename = "player_joined")]
-    PlayerJoined { game_id: Uuid, player: Player },
-    #[serde(rename = "player_eliminated")]
-    PlayerEliminated { game_id: Uuid, player_id: Uuid },
-    #[serde(rename = "game_started")]
-    GameStarted { game_id: Uuid, players: Vec<Player> },
-    #[serde(rename = "game_ended")]
+    #[serde(rename = "playerJoined")]
+    PlayerJoined { 
+        game_id: Uuid, 
+        player: Player 
+    },
+    #[serde(rename = "playerLeft")]
+    PlayerLeft { 
+        game_id: Uuid, 
+        player_id: Uuid 
+    },
+    #[serde(rename = "playerEliminated")]
+    PlayerEliminated { 
+        game_id: Uuid, 
+        player_id: Uuid 
+    },
+    #[serde(rename = "gameStarted")]
+    GameStarted { 
+        game_id: Uuid, 
+        players: Vec<Player> 
+    },
+    #[serde(rename = "gameEnded")]
     GameEnded {
         game_id: Uuid,
         winner: Option<Player>,
     },
     #[serde(rename = "error")]
-    Error { message: String },
+    Error { 
+        message: String 
+    },
 }
 
-#[derive(Debug, Deserialize)]
-pub struct WebSocketRequest {
-    pub action: String,
-    pub player_id: Option<Uuid>,
-    pub change_amount: Option<i32>,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "action", rename_all = "camelCase")]
+pub enum WebSocketRequest {
+    #[serde(rename = "updateLife")]
+    UpdateLife {
+        #[serde(rename = "playerId")]
+        player_id: Uuid,
+        #[serde(rename = "changeAmount")]
+        change_amount: i32,
+    },
+    #[serde(rename = "joinGame")]
+    JoinGame {
+        #[serde(rename = "clerkUserId")]
+        clerk_user_id: String,
+    },
+    #[serde(rename = "leaveGame")]
+    LeaveGame {
+        #[serde(rename = "playerId")]
+        player_id: Uuid,
+    },
+    #[serde(rename = "getGameState")]
+    GetGameState,
 }
 
 // Constants
