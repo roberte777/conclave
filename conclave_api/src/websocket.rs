@@ -53,10 +53,10 @@ async fn handle_socket(socket: WebSocket, params: WebSocketQuery, state: AppStat
         return;
     }
 
-    // add user to the game if they are not part of it already
+    // Add user to the game if they are not part of it already
     let add_user_result = add_user_to_game(&state, game_id, &clerk_user_id).await;
     if let Err(e) = add_user_result {
-        error!("Failed to add user to game");
+        error!("Failed to add user to game: {:?}", e);
         let error_msg = WebSocketMessage::Error {
             message: e.to_string(),
         };
@@ -70,9 +70,8 @@ async fn handle_socket(socket: WebSocket, params: WebSocketQuery, state: AppStat
         "WebSocket connected - Game: {}, User: {}",
         game_id, clerk_user_id
     );
-    // Get receiver for game room messages. Do this before getting the initial
-    // state so we will get any updates between sending the initial state and
-    // handling updates.
+
+    // Get receiver for game room messages - this will create the room if it doesn't exist
     let mut game_receiver = state.get_game_receiver(game_id);
 
     // Send initial game state
@@ -199,6 +198,7 @@ async fn handle_websocket_message(text: &str, game_id: Uuid, state: &AppState) -
             handle_leave_game(player_id, game_id, state).await
         }
         WebSocketRequest::GetGameState => handle_get_game_state(game_id, state).await,
+        WebSocketRequest::EndGame => handle_end_game(game_id, state).await,
     }
 }
 
@@ -213,12 +213,12 @@ async fn handle_life_update(
         game_id, player_id, change_amount
     );
 
+    // Update player life
     let (updated_player, _life_change) =
         database::update_player_life(&state.db, player_id, change_amount).await?;
 
     info!(
-        "✅ Player life updated: {} -> {}",
-        updated_player.current_life - change_amount,
+        "✅ Player life updated: new life = {}",
         updated_player.current_life
     );
 
@@ -300,6 +300,31 @@ async fn handle_get_game_state(game_id: Uuid, state: &AppState) -> Result<()> {
 
     state.broadcast_to_game(game_id, message);
 
+    Ok(())
+}
+
+async fn handle_end_game(game_id: Uuid, state: &AppState) -> Result<()> {
+    info!("Ending game {} via WebSocket request", game_id);
+
+    // End the game in the database
+    let _ = database::end_game(&state.db, game_id).await?;
+
+    // Get all players to determine winner (player with highest life)
+    let players = database::get_players_in_game(&state.db, game_id).await?;
+    let winner = players.iter().max_by_key(|p| p.current_life).cloned();
+
+    // Broadcast game ended event
+    let message = WebSocketMessage::GameEnded { game_id, winner };
+    state.broadcast_to_game(game_id, message);
+
+    // Clean up WebSocket room after a delay to allow final messages
+    let state_clone = state.clone();
+    tokio::spawn(async move {
+        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+        state_clone.cleanup_game_room(game_id);
+    });
+
+    info!("Game {} ended via WebSocket request", game_id);
     Ok(())
 }
 

@@ -83,6 +83,12 @@ pub struct GameWithUsers {
     pub users: Vec<UserInfo>, // User info from players
 }
 
+// Result type for game ending operations
+#[derive(Debug, Clone, Serialize)]
+pub struct GameEndResult {
+    pub winner: Option<Player>,
+}
+
 // WebSocket Message Types
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(
@@ -105,10 +111,7 @@ pub enum WebSocketMessage {
         game_id: Uuid,
         player_id: Uuid,
     },
-    PlayerEliminated {
-        game_id: Uuid,
-        player_id: Uuid,
-    },
+
     GameStarted {
         game_id: Uuid,
         players: Vec<Player>,
@@ -133,6 +136,7 @@ pub enum WebSocketRequest {
     JoinGame { clerk_user_id: String },
     LeaveGame { player_id: Uuid },
     GetGameState,
+    EndGame,
 }
 
 // Constants

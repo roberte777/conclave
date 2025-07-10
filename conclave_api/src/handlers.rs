@@ -56,6 +56,9 @@ pub async fn create_game(
     )
     .await?;
 
+    // Initialize WebSocket room for the new game
+    state.get_or_create_game_room(game.id);
+
     info!("Game created and started: {} ({})", game.name, game.id);
     Ok(Json(game))
 }
@@ -149,23 +152,11 @@ pub async fn update_life(
         return Err(ApiError::GameNotActive);
     }
 
-    // Verify player belongs to this game
-    let players = database::get_players_in_game(&state.db, game_id).await?;
-    let target_player = players
-        .iter()
-        .find(|p| p.id == request.player_id)
-        .ok_or(ApiError::PlayerNotFound)?;
-
-    if target_player.is_eliminated {
-        return Err(ApiError::BadRequest(
-            "Cannot modify life of eliminated player".to_string(),
-        ));
-    }
-
+    // Update player life
     let (updated_player, _life_change) =
         database::update_player_life(&state.db, request.player_id, request.change_amount).await?;
 
-    // Broadcast update via WebSocket
+    // Broadcast life update via WebSocket
     let message = WebSocketMessage::LifeUpdate {
         game_id,
         player_id: request.player_id,
@@ -174,27 +165,9 @@ pub async fn update_life(
     };
     state.broadcast_to_game(game_id, message);
 
-    // Check if player was eliminated
-    if updated_player.is_eliminated && !target_player.is_eliminated {
-        let elimination_message = WebSocketMessage::PlayerEliminated {
-            game_id,
-            player_id: request.player_id,
-        };
-        state.broadcast_to_game(game_id, elimination_message);
-    }
-
-    // Check if game should end (only one player left)
-    let remaining_players_count = players.iter().filter(|p| !p.is_eliminated).count();
-    if remaining_players_count <= 1 {
-        database::end_game(&state.db, game_id).await?;
-        let winner = players.iter().find(|p| !p.is_eliminated).cloned();
-        let end_message = WebSocketMessage::GameEnded { game_id, winner };
-        state.broadcast_to_game(game_id, end_message);
-    }
-
     info!(
-        "Life updated for player {} in game {}: {} -> {}",
-        request.player_id, game_id, target_player.current_life, updated_player.current_life
+        "Life updated for player {} in game {}: new life = {}",
+        request.player_id, game_id, updated_player.current_life
     );
     Ok(Json(updated_player))
 }
@@ -207,13 +180,19 @@ pub async fn end_game(
 
     let game = database::end_game(&state.db, game_id).await?;
 
-    // Get remaining players to determine winner
+    // Get all players to determine winner (player with highest life)
     let players = database::get_players_in_game(&state.db, game_id).await?;
-    let winner = players.iter().find(|p| !p.is_eliminated).cloned();
+    let winner = players.iter().max_by_key(|p| p.current_life).cloned();
 
     // Broadcast game ended event
     let message = WebSocketMessage::GameEnded { game_id, winner };
     state.broadcast_to_game(game_id, message);
+
+    // Clean up WebSocket room
+    tokio::spawn(async move {
+        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+        state.cleanup_game_room(game_id);
+    });
 
     info!("Game ended: {} ({})", game.name, game.id);
     Ok(Json(game))

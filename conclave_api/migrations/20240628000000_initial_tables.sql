@@ -35,3 +35,17 @@ CREATE TABLE IF NOT EXISTS life_changes (
     FOREIGN KEY (game_id) REFERENCES games (id) ON DELETE CASCADE,
     FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
 ); 
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_active_game_name 
+ON games(name) WHERE status = 'active';
+
+-- Add indexes for better performance and locking
+CREATE INDEX IF NOT EXISTS idx_players_game_id ON players(game_id);
+CREATE INDEX IF NOT EXISTS idx_players_clerk_user_id ON players(clerk_user_id);
+CREATE INDEX IF NOT EXISTS idx_players_game_user ON players(game_id, clerk_user_id);
+CREATE INDEX IF NOT EXISTS idx_life_changes_game_id ON life_changes(game_id);
+CREATE INDEX IF NOT EXISTS idx_life_changes_created_at ON life_changes(game_id, created_at);
+
+-- Add constraint to prevent duplicate positions in the same game
+CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_game_position 
+ON players(game_id, position); 

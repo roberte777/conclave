@@ -163,7 +163,6 @@ export default function LiveGamePage() {
                                     return {
                                         ...p,
                                         current_life: message.new_life!,
-                                        is_eliminated: message.new_life! <= 0,
                                     };
                                 }
                                 return p;
@@ -287,8 +286,14 @@ export default function LiveGamePage() {
 
         if (confirm("Are you sure you want to end this game?")) {
             try {
-                await gameApi.end(gameId);
-                toast.success("Game ended successfully");
+                const messageData: WebSocketSendMessage = {
+                    action: "end_game",
+                    game_id: gameId,
+                };
+
+                console.log(`📤 Sending end game request for game ${gameId}`);
+                sendMessage(JSON.stringify(messageData));
+                toast.success("Game ending...");
                 // The WebSocket will handle redirecting to finished games page
             } catch (error) {
                 console.error("Failed to end game:", error);
@@ -345,8 +350,6 @@ export default function LiveGamePage() {
     }
 
     const { game, players } = gameState;
-    const activePlayers = players.filter((p) => !p.is_eliminated);
-    const eliminatedPlayers = players.filter((p) => p.is_eliminated);
 
     return (
         <div className="container mx-auto p-6 max-w-6xl">
@@ -402,13 +405,11 @@ export default function LiveGamePage() {
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {players.map((player) => {
                     const isCurrentUser = player.clerk_user_id === user?.id;
-                    const canModify = !player.is_eliminated;
 
                     return (
                         <Card
                             key={player.id}
                             className={`
-                ${player.is_eliminated ? "opacity-50 bg-gray-50" : ""}
                 ${isCurrentUser ? "ring-2 ring-blue-500" : ""}
                 ${player.current_life <= 0 ? "border-red-300" : ""}
               `}
@@ -423,11 +424,6 @@ export default function LiveGamePage() {
                                             </span>
                                         )}
                                     </CardTitle>
-                                    {player.is_eliminated && (
-                                        <Badge variant="destructive" className="text-xs">
-                                            Eliminated
-                                        </Badge>
-                                    )}
                                 </div>
                             </CardHeader>
                             <CardContent>
@@ -443,50 +439,48 @@ export default function LiveGamePage() {
                                         </span>
                                     </div>
 
-                                    {canModify && (
-                                        <div className="space-y-2">
-                                            <div className="flex gap-2">
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => handleLifeChange(player.id, -1)}
-                                                    className="flex-1"
-                                                    disabled={!isConnected}
-                                                >
-                                                    <Minus className="h-4 w-4" />
-                                                </Button>
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => handleLifeChange(player.id, 1)}
-                                                    className="flex-1"
-                                                    disabled={!isConnected}
-                                                >
-                                                    <Plus className="h-4 w-4" />
-                                                </Button>
-                                            </div>
-                                            <div className="flex gap-2">
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => handleLifeChange(player.id, -5)}
-                                                    className="flex-1"
-                                                    disabled={!isConnected}
-                                                >
-                                                    -5
-                                                </Button>
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => handleLifeChange(player.id, 5)}
-                                                    className="flex-1"
-                                                    disabled={!isConnected}
-                                                >
-                                                    +5
-                                                </Button>
-                                            </div>
+                                    <div className="space-y-2">
+                                        <div className="flex gap-2">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => handleLifeChange(player.id, -1)}
+                                                className="flex-1"
+                                                disabled={!isConnected}
+                                            >
+                                                <Minus className="h-4 w-4" />
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => handleLifeChange(player.id, 1)}
+                                                className="flex-1"
+                                                disabled={!isConnected}
+                                            >
+                                                <Plus className="h-4 w-4" />
+                                            </Button>
                                         </div>
-                                    )}
+                                        <div className="flex gap-2">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => handleLifeChange(player.id, -5)}
+                                                className="flex-1"
+                                                disabled={!isConnected}
+                                            >
+                                                -5
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => handleLifeChange(player.id, 5)}
+                                                className="flex-1"
+                                                disabled={!isConnected}
+                                            >
+                                                +5
+                                            </Button>
+                                        </div>
+                                    </div>
                                 </div>
                             </CardContent>
                         </Card>
@@ -505,19 +499,6 @@ export default function LiveGamePage() {
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-2">
-                            <div className="flex justify-between">
-                                <span>Active Players:</span>
-                                <span className="font-semibold">{activePlayers.length}</span>
-                            </div>
-                            {eliminatedPlayers.length > 0 && (
-                                <div className="flex justify-between">
-                                    <span>Eliminated Players:</span>
-                                    <span className="font-semibold">
-                                        {eliminatedPlayers.length}
-                                    </span>
-                                </div>
-                            )}
-                            <Separator />
                             <div className="flex justify-between">
                                 <span>Total Players:</span>
                                 <span className="font-semibold">{players.length}</span>

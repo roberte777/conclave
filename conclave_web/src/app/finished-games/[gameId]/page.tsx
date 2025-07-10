@@ -100,9 +100,9 @@ export default function FinishedGamePage() {
     }
 
     const { game, players } = gameState;
-    const activePlayers = players.filter((p) => !p.is_eliminated);
-    const eliminatedPlayers = players.filter((p) => p.is_eliminated);
-    const winner = activePlayers.length === 1 ? activePlayers[0] : null;
+    const winner = players.length > 0 ? players.reduce((prev, current) =>
+        (prev.current_life > current.current_life) ? prev : current
+    ) : null;
 
     return (
         <div className="container mx-auto p-6 max-w-6xl">
@@ -188,41 +188,37 @@ export default function FinishedGamePage() {
                                 </div>
                             )}
 
-                            {/* Eliminated Players */}
-                            {eliminatedPlayers.length > 0 && (
-                                <div className="space-y-2">
-                                    <h4 className="text-sm font-medium text-muted-foreground">
-                                        Eliminated Players
-                                    </h4>
-                                    {eliminatedPlayers
-                                        .sort((a, b) => b.current_life - a.current_life)
-                                        .map((player, index) => (
-                                            <div
-                                                key={player.id}
-                                                className="flex items-center justify-between p-2 bg-gray-50 rounded-lg"
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <span className="text-sm text-muted-foreground">
-                                                        #{eliminatedPlayers.length - index + (winner ? 1 : 0)}
-                                                    </span>
-                                                    <span>
-                                                        Player {player.position}
-                                                        {player.clerk_user_id === user?.id && " (You)"}
-                                                    </span>
-                                                    <Badge variant="destructive" className="text-xs">
-                                                        Eliminated
-                                                    </Badge>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <Heart className="h-4 w-4 text-red-500" />
-                                                    <span className="font-semibold text-red-500">
-                                                        {player.current_life}
-                                                    </span>
-                                                </div>
+                            {/* All Players Ranked by Life */}
+                            <div className="space-y-2">
+                                <h4 className="text-sm font-medium text-muted-foreground">
+                                    Final Rankings
+                                </h4>
+                                {players
+                                    .sort((a, b) => b.current_life - a.current_life)
+                                    .filter(player => player.id !== winner?.id)
+                                    .map((player, index) => (
+                                        <div
+                                            key={player.id}
+                                            className="flex items-center justify-between p-2 bg-gray-50 rounded-lg"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <span className="text-sm text-muted-foreground">
+                                                    #{index + 2}
+                                                </span>
+                                                <span>
+                                                    Player {player.position}
+                                                    {player.clerk_user_id === user?.id && " (You)"}
+                                                </span>
                                             </div>
-                                        ))}
-                                </div>
-                            )}
+                                            <div className="flex items-center gap-2">
+                                                <Heart className="h-4 w-4 text-red-400" />
+                                                <span className="font-semibold">
+                                                    {player.current_life}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))}
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
@@ -238,7 +234,6 @@ export default function FinishedGamePage() {
                         <Card
                             key={player.id}
                             className={`
-                ${player.is_eliminated ? "opacity-75" : ""}
                 ${isCurrentUser ? "ring-2 ring-blue-500" : ""}
                 ${isWinner ? "ring-2 ring-yellow-500 bg-yellow-50" : ""}
                 ${player.current_life <= 0 ? "border-red-300" : ""}
@@ -256,15 +251,6 @@ export default function FinishedGamePage() {
                                     </CardTitle>
                                     <div className="flex gap-1">
                                         {isWinner && <Crown className="h-4 w-4 text-yellow-600" />}
-                                        {player.is_eliminated ? (
-                                            <Badge variant="destructive" className="text-xs">
-                                                Eliminated
-                                            </Badge>
-                                        ) : (
-                                            <Badge variant="default" className="text-xs">
-                                                Survived
-                                            </Badge>
-                                        )}
                                     </div>
                                 </div>
                             </CardHeader>
@@ -311,10 +297,7 @@ export default function FinishedGamePage() {
                                 <span>Total Players:</span>
                                 <span className="font-semibold">{players.length}</span>
                             </div>
-                            <div className="flex justify-between">
-                                <span>Players Eliminated:</span>
-                                <span className="font-semibold">{eliminatedPlayers.length}</span>
-                            </div>
+
                             <div className="flex justify-between">
                                 <span>Starting Life:</span>
                                 <span className="font-semibold">{game.starting_life}</span>
