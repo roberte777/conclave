@@ -63,6 +63,7 @@ async fn handle_socket(socket: WebSocket, params: WebSocketQuery, state: AppStat
         if let Ok(msg) = serde_json::to_string(&error_msg) {
             let _ = sender.send(Message::Text(msg.into())).await;
         }
+        return;
     }
 
     info!(
@@ -70,25 +71,8 @@ async fn handle_socket(socket: WebSocket, params: WebSocketQuery, state: AppStat
         game_id, clerk_user_id
     );
 
-    // Add user to game room if they aren't already (maybe connected on two devices).
-    if !state.is_user_connected_to_game(game_id, &clerk_user_id) {
-        state.add_user_to_game(game_id, clerk_user_id.clone());
-    }
-
     // Get receiver for game room messages
     let mut game_receiver = state.get_game_receiver(game_id);
-
-    // Log current connected users
-    let connected_users = state.get_connected_users_in_game(game_id);
-    info!(
-        "🔗 Connected users in game {}: {} total - {:?}",
-        game_id,
-        connected_users.len(),
-        connected_users
-            .iter()
-            .map(|u| &u.clerk_user_id)
-            .collect::<Vec<_>>()
-    );
 
     // Send initial game state
     if let Err(e) = send_initial_game_state(&mut sender, &state, game_id).await {
@@ -145,19 +129,6 @@ async fn handle_socket(socket: WebSocket, params: WebSocketQuery, state: AppStat
     info!(
         "WebSocket disconnected - Game: {}, User: {}",
         game_id, clerk_user_id
-    );
-    state.remove_user_from_game(game_id, &clerk_user_id);
-
-    // Log remaining connected users
-    let remaining_users = state.get_connected_users_in_game(game_id);
-    info!(
-        "🔗 Remaining users in game {} after disconnect: {} total - {:?}",
-        game_id,
-        remaining_users.len(),
-        remaining_users
-            .iter()
-            .map(|u| &u.clerk_user_id)
-            .collect::<Vec<_>>()
     );
 }
 
@@ -216,18 +187,17 @@ async fn handle_websocket_message(text: &str, game_id: Uuid, state: &AppState) -
         serde_json::from_str(text).map_err(|_| ApiError::BadRequest("Invalid JSON".to_string()))?;
 
     match request {
-        WebSocketRequest::UpdateLife { player_id, change_amount } => {
-            handle_life_update(player_id, change_amount, game_id, state).await
-        }
+        WebSocketRequest::UpdateLife {
+            player_id,
+            change_amount,
+        } => handle_life_update(player_id, change_amount, game_id, state).await,
         WebSocketRequest::JoinGame { clerk_user_id } => {
             handle_join_game(clerk_user_id, game_id, state).await
         }
         WebSocketRequest::LeaveGame { player_id } => {
             handle_leave_game(player_id, game_id, state).await
         }
-        WebSocketRequest::GetGameState => {
-            handle_get_game_state(game_id, state).await
-        }
+        WebSocketRequest::GetGameState => handle_get_game_state(game_id, state).await,
     }
 }
 
@@ -271,24 +241,20 @@ async fn handle_life_update(
     Ok(())
 }
 
-async fn handle_join_game(
-    clerk_user_id: String,
-    game_id: Uuid,
-    state: &AppState,
-) -> Result<()> {
+async fn handle_join_game(clerk_user_id: String, game_id: Uuid, state: &AppState) -> Result<()> {
     // Add user to game if not already present
     let result = database::join_game(&state.db, game_id, &clerk_user_id).await;
-    
+
     match result {
         Ok(player) => {
             info!("🎮 Player {} joined game {}", clerk_user_id, game_id);
-            
+
             // Broadcast player joined message
             let message = WebSocketMessage::PlayerJoined {
                 game_id,
                 player: player.clone(),
             };
-            
+
             state.broadcast_to_game(game_id, message);
             Ok(())
         }
@@ -299,33 +265,29 @@ async fn handle_join_game(
     }
 }
 
-async fn handle_leave_game(
-    player_id: Uuid,
-    game_id: Uuid,
-    state: &AppState,
-) -> Result<()> {
+async fn handle_leave_game(player_id: Uuid, game_id: Uuid, state: &AppState) -> Result<()> {
     info!("🎮 Player {} leaving game {}", player_id, game_id);
-    
+
     // Get player info to extract clerk_user_id
     let players = database::get_players_in_game(&state.db, game_id).await?;
-    let player = players.iter().find(|p| p.id == player_id)
+    let player = players
+        .iter()
+        .find(|p| p.id == player_id)
         .ok_or(ApiError::PlayerNotFound)?;
-    
+
     let clerk_user_id = &player.clerk_user_id;
-    
+
     // Remove player from game
     database::leave_game(&state.db, game_id, clerk_user_id).await?;
-    
+
     // Broadcast player left message
-    let message = WebSocketMessage::PlayerLeft {
-        game_id,
-        player_id,
-    };
-    
+    let message = WebSocketMessage::PlayerLeft { game_id, player_id };
+
     state.broadcast_to_game(game_id, message);
-    
+
     info!("📤 Player left broadcast completed for game {}", game_id);
     Ok(())
+}
 
 async fn handle_get_game_state(game_id: Uuid, state: &AppState) -> Result<()> {
     let game_state = database::get_game_state(&state.db, game_id).await?;
