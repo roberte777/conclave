@@ -3,8 +3,6 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
 
-// User data is handled by Clerk, so no local User struct needed
-
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Game {
     pub id: Uuid,
@@ -87,67 +85,53 @@ pub struct GameWithUsers {
 
 // WebSocket Message Types
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "camelCase")]
+#[serde(
+    tag = "type",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 pub enum WebSocketMessage {
-    #[serde(rename = "lifeUpdate")]
     LifeUpdate {
         game_id: Uuid,
         player_id: Uuid,
         new_life: i32,
         change_amount: i32,
     },
-    #[serde(rename = "playerJoined")]
-    PlayerJoined { 
-        game_id: Uuid, 
-        player: Player 
+    PlayerJoined {
+        game_id: Uuid,
+        player: Player,
     },
-    #[serde(rename = "playerLeft")]
-    PlayerLeft { 
-        game_id: Uuid, 
-        player_id: Uuid 
+    PlayerLeft {
+        game_id: Uuid,
+        player_id: Uuid,
     },
-    #[serde(rename = "playerEliminated")]
-    PlayerEliminated { 
-        game_id: Uuid, 
-        player_id: Uuid 
+    PlayerEliminated {
+        game_id: Uuid,
+        player_id: Uuid,
     },
-    #[serde(rename = "gameStarted")]
-    GameStarted { 
-        game_id: Uuid, 
-        players: Vec<Player> 
+    GameStarted {
+        game_id: Uuid,
+        players: Vec<Player>,
     },
-    #[serde(rename = "gameEnded")]
     GameEnded {
         game_id: Uuid,
         winner: Option<Player>,
     },
-    #[serde(rename = "error")]
-    Error { 
-        message: String 
+    Error {
+        message: String,
     },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "action", rename_all = "camelCase")]
+#[serde(
+    tag = "action",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 pub enum WebSocketRequest {
-    #[serde(rename = "updateLife")]
-    UpdateLife {
-        #[serde(rename = "playerId")]
-        player_id: Uuid,
-        #[serde(rename = "changeAmount")]
-        change_amount: i32,
-    },
-    #[serde(rename = "joinGame")]
-    JoinGame {
-        #[serde(rename = "clerkUserId")]
-        clerk_user_id: String,
-    },
-    #[serde(rename = "leaveGame")]
-    LeaveGame {
-        #[serde(rename = "playerId")]
-        player_id: Uuid,
-    },
-    #[serde(rename = "getGameState")]
+    UpdateLife { player_id: Uuid, change_amount: i32 },
+    JoinGame { clerk_user_id: String },
+    LeaveGame { player_id: Uuid },
     GetGameState,
 }
 

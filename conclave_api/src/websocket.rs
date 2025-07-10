@@ -70,8 +70,9 @@ async fn handle_socket(socket: WebSocket, params: WebSocketQuery, state: AppStat
         "WebSocket connected - Game: {}, User: {}",
         game_id, clerk_user_id
     );
-
-    // Get receiver for game room messages
+    // Get receiver for game room messages. Do this before getting the initial
+    // state so we will get any updates between sending the initial state and
+    // handling updates.
     let mut game_receiver = state.get_game_receiver(game_id);
 
     // Send initial game state
@@ -148,7 +149,7 @@ async fn add_user_to_game(state: &AppState, game_id: Uuid, clerk_user_id: &str) 
     let players = database::get_players_in_game(&state.db, game_id).await?;
     let player = players.iter().find(|p| p.clerk_user_id == clerk_user_id);
     if player.is_none() {
-        database::join_game(&state.db, game_id, clerk_user_id).await?;
+        handle_join_game(clerk_user_id, game_id, state).await?;
     }
     Ok(())
 }
@@ -192,7 +193,7 @@ async fn handle_websocket_message(text: &str, game_id: Uuid, state: &AppState) -
             change_amount,
         } => handle_life_update(player_id, change_amount, game_id, state).await,
         WebSocketRequest::JoinGame { clerk_user_id } => {
-            handle_join_game(clerk_user_id, game_id, state).await
+            handle_join_game(&clerk_user_id, game_id, state).await
         }
         WebSocketRequest::LeaveGame { player_id } => {
             handle_leave_game(player_id, game_id, state).await
@@ -208,7 +209,7 @@ async fn handle_life_update(
     state: &AppState,
 ) -> Result<()> {
     info!(
-        "🎮 Processing life update for game {}, player {}, change {}",
+        "Processing life update for game {}, player {}, change {}",
         game_id, player_id, change_amount
     );
 
@@ -230,24 +231,24 @@ async fn handle_life_update(
     };
 
     info!(
-        "📡 Broadcasting life update message to all clients in game {}: {:?}",
+        "Broadcasting life update message to all clients in game {}: {:?}",
         game_id, message
     );
 
     state.broadcast_to_game(game_id, message);
 
-    info!("📤 Life update broadcast completed for game {}", game_id);
+    info!("Life update broadcast completed for game {}", game_id);
 
     Ok(())
 }
 
-async fn handle_join_game(clerk_user_id: String, game_id: Uuid, state: &AppState) -> Result<()> {
+async fn handle_join_game(clerk_user_id: &str, game_id: Uuid, state: &AppState) -> Result<()> {
     // Add user to game if not already present
-    let result = database::join_game(&state.db, game_id, &clerk_user_id).await;
+    let result = database::join_game(&state.db, game_id, clerk_user_id).await;
 
     match result {
         Ok(player) => {
-            info!("🎮 Player {} joined game {}", clerk_user_id, game_id);
+            info!("Player {} joined game {}", clerk_user_id, game_id);
 
             // Broadcast player joined message
             let message = WebSocketMessage::PlayerJoined {
@@ -266,7 +267,7 @@ async fn handle_join_game(clerk_user_id: String, game_id: Uuid, state: &AppState
 }
 
 async fn handle_leave_game(player_id: Uuid, game_id: Uuid, state: &AppState) -> Result<()> {
-    info!("🎮 Player {} leaving game {}", player_id, game_id);
+    info!("Player {} leaving game {}", player_id, game_id);
 
     // Get player info to extract clerk_user_id
     let players = database::get_players_in_game(&state.db, game_id).await?;
@@ -308,14 +309,5 @@ pub async fn broadcast_player_joined(
     player: crate::models::Player,
 ) {
     let message = WebSocketMessage::PlayerJoined { game_id, player };
-    state.broadcast_to_game(game_id, message);
-}
-
-pub async fn broadcast_game_started(
-    state: &AppState,
-    game_id: Uuid,
-    players: Vec<crate::models::Player>,
-) {
-    let message = WebSocketMessage::GameStarted { game_id, players };
     state.broadcast_to_game(game_id, message);
 }

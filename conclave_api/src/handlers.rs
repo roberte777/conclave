@@ -55,10 +55,6 @@ pub async fn create_game(
         &request.clerk_user_id,
     )
     .await?;
-    let players = database::get_players_in_game(&state.db, game.id).await?;
-
-    // Broadcast game started event to WebSocket clients since the game is immediately active
-    websocket::broadcast_game_started(&state, game.id, players).await;
 
     info!("Game created and started: {} ({})", game.name, game.id);
     Ok(Json(game))
