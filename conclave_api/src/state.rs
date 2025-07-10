@@ -71,33 +71,27 @@ impl AppState {
             .expect("Should have a game if broadcasting to a game");
 
         let connected_count = room_entry.connected_users.len();
-        let connected_users: Vec<String> = room_entry
-            .connected_users
-            .iter()
-            .map(|entry| entry.key().clone())
-            .collect();
 
-        tracing::info!(
-            "📡 Broadcasting message to game {} with {} connected users: {:?}",
-            game_id,
-            connected_count,
-            connected_users
+        tracing::debug!(
+            game_id = %game_id,
+            connected_count = connected_count,
+            "Broadcasting message to game"
         );
 
         let send_result = room_entry.sender.send(message);
         match send_result {
             Ok(receivers) => {
-                tracing::info!(
-                    "✅ Message broadcast successful to {} receivers in game {}",
-                    receivers,
-                    game_id
+                tracing::debug!(
+                    game_id = %game_id,
+                    receivers = receivers,
+                    "Message broadcast successful"
                 );
             }
             Err(e) => {
                 tracing::error!(
-                    "❌ Failed to broadcast message to game {}: {:?}",
-                    game_id,
-                    e
+                    game_id = %game_id,
+                    error = ?e,
+                    "Failed to broadcast message to game"
                 );
             }
         }

@@ -36,7 +36,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Initialize database
     let db_pool = database::create_pool().await?;
-    info!("✅ Database connected and migrations completed");
+    info!("Database connected and migrations completed");
 
     // Create application state
     let app_state = AppState::new(db_pool);
@@ -95,9 +95,9 @@ async fn main() -> anyhow::Result<()> {
     let addr = SocketAddr::from(([0, 0, 0, 0], 3001));
     let listener = tokio::net::TcpListener::bind(addr).await?;
 
-    info!("🚀 Conclave API Server running on http://{}", addr);
-    info!("📡 API endpoints available at http://{}/api/v1/", addr);
-    info!("📡 WebSocket endpoint available at ws://{}/ws", addr);
+    info!("Conclave API Server running on http://{}", addr);
+    info!("API endpoints available at http://{}/api/v1/", addr);
+    info!("WebSocket endpoint available at ws://{}/ws", addr);
 
     axum::serve(listener, app).await?;
 
