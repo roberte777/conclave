@@ -32,7 +32,7 @@ public struct CircularBuffer<Element> {
         storage[tail] = element
         tail = (tail + 1) % capacity
 
-        if isFull {
+        if _count == capacity {
             // Buffer is full, overwrite the oldest element
             head = (head + 1) % capacity
         } else {
@@ -149,50 +149,68 @@ extension CircularBuffer: Collection {
 // MARK: - Thread-Safe Wrapper
 
 /// A thread-safe wrapper around CircularBuffer
-public final class SynchronizedCircularBuffer<Element>: @unchecked Sendable {
-    private var buffer: CircularBuffer<Element>
+/// Uses a concurrent queue with proper barrier synchronization for optimal performance.
+/// @unchecked Sendable is safe here because:
+/// 1. All reads use concurrent access (safe for immutable operations)
+/// 2. All writes use barrier flags to ensure exclusive access during mutations
+/// 3. Element is constrained to Sendable
+/// 4. The concurrent queue with barriers provides proper read-write synchronization
+public final class SynchronizedCircularBuffer<Element: Sendable>: @unchecked
+    Sendable
+{
+    private var _buffer: CircularBuffer<Element>
     private let queue = DispatchQueue(
         label: "com.conclave.circular-buffer",
         attributes: .concurrent
     )
 
     public init(capacity: Int) {
-        self.buffer = CircularBuffer(capacity: capacity)
+        self._buffer = CircularBuffer(capacity: capacity)
     }
 
+    // Read operations - can be concurrent
     public var count: Int {
-        return queue.sync { buffer.count }
+        return queue.sync { _buffer.count }
     }
 
     public var isEmpty: Bool {
-        return queue.sync { buffer.isEmpty }
+        return queue.sync { _buffer.isEmpty }
     }
 
     public var isFull: Bool {
-        return queue.sync { buffer.isFull }
+        return queue.sync { _buffer.isFull }
     }
 
+    public func recent(_ n: Int) -> [Element] {
+        return queue.sync { _buffer.recent(n) }
+    }
+
+    public func first() -> Element? {
+        return queue.sync { _buffer.first() }
+    }
+
+    public func last() -> Element? {
+        return queue.sync { _buffer.last() }
+    }
+
+    // Write operations - require exclusive access with barriers
     public func append(_ element: Element) {
         queue.async(flags: .barrier) {
-            self.buffer.append(element)
+            self._buffer.append(element)
         }
     }
 
     public func removeFirst() -> Element? {
-        return queue.sync(flags: .barrier) {
-            return buffer.removeFirst()
-        }
+        return queue.sync(flags: .barrier) { _buffer.removeFirst() }
     }
 
-    public func recent(_ n: Int) -> [Element] {
-        return queue.sync {
-            return buffer.recent(n)
-        }
+    public func removeLast() -> Element? {
+        return queue.sync(flags: .barrier) { _buffer.removeLast() }
     }
 
     public func removeAll() {
         queue.async(flags: .barrier) {
-            self.buffer.removeAll()
+            self._buffer.removeAll()
         }
     }
 }
