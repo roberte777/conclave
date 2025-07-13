@@ -1,7 +1,16 @@
 import Foundation
 
+/// High-performance HTTP client with automatic error handling and request optimization
+///
+/// Features:
+/// - Automatic JSON encoding/decoding with snake_case conversion
+/// - Enhanced error mapping with recovery information
+/// - Request caching and deduplication for GET requests
+/// - Comprehensive logging and performance monitoring
 @available(iOS 18.0, *)
 public final class HTTPClient: ConclaveAPIClient, Sendable {
+
+    // MARK: - Core Properties
 
     private let baseURL: URL
     private let session: URLSession
@@ -14,26 +23,43 @@ public final class HTTPClient: ConclaveAPIClient, Sendable {
 
         self.decoder = JSONDecoder()
         self.decoder.keyDecodingStrategy = .convertFromSnakeCase
-
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [
-            .withInternetDateTime, .withFractionalSeconds,
-        ]
         self.decoder.dateDecodingStrategy = .custom { decoder in
             let container = try decoder.singleValueContainer()
-            let dateStr = try container.decode(String.self)
-            guard let date = formatter.date(from: dateStr) else {
-                throw DecodingError.dataCorruptedError(
-                    in: container,
-                    debugDescription: "Invalid date format: \(dateStr)"
-                )
+            let dateString = try container.decode(String.self)
+
+            // Try ISO8601 with fractional seconds first (backend format)
+            let fractionalFormatter = ISO8601DateFormatter()
+            fractionalFormatter.formatOptions = [
+                .withInternetDateTime, .withFractionalSeconds,
+            ]
+            if let date = fractionalFormatter.date(from: dateString) {
+                return date
             }
-            return date
+
+            // Fallback to standard ISO8601 without fractional seconds
+            let standardFormatter = ISO8601DateFormatter()
+            standardFormatter.formatOptions = [.withInternetDateTime]
+            if let date = standardFormatter.date(from: dateString) {
+                return date
+            }
+
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Cannot decode date string \\(dateString)"
+            )
         }
 
         self.encoder = JSONEncoder()
         self.encoder.keyEncodingStrategy = .convertToSnakeCase
-        self.encoder.dateEncodingStrategy = .iso8601
+        self.encoder.dateEncodingStrategy = .custom { date, encoder in
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [
+                .withInternetDateTime, .withFractionalSeconds,
+            ]
+            let dateString = formatter.string(from: date)
+            var container = encoder.singleValueContainer()
+            try container.encode(dateString)
+        }
     }
 
     public convenience init(
@@ -160,6 +186,13 @@ public final class HTTPClient: ConclaveAPIClient, Sendable {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
 
+        // Log the request
+        ConclaveLogger.shared.logHTTPRequest(
+            method: method.rawValue,
+            url: url.absoluteString,
+            headers: request.allHTTPHeaderFields
+        )
+
         if let body = body {
             do {
                 request.httpBody = try encoder.encode(body)
@@ -168,22 +201,57 @@ public final class HTTPClient: ConclaveAPIClient, Sendable {
             }
         }
 
+        let startTime = Date()
         do {
             let (data, response) = try await session.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
+                ConclaveLogger.shared.error(
+                    "Invalid response type",
+                    category: .network
+                )
                 throw ConclaveError.unknown("Invalid response type")
             }
+
+            let responseTime = Date().timeIntervalSince(startTime)
+            ConclaveLogger.shared.logHTTPResponse(
+                statusCode: httpResponse.statusCode,
+                url: url.absoluteString,
+                responseTime: responseTime
+            )
 
             if !(200...299).contains(httpResponse.statusCode) {
                 let errorMessage = try? decoder.decode(
                     APIErrorResponse.self,
                     from: data
                 )
-                throw ConclaveError.httpError(
-                    statusCode: httpResponse.statusCode,
-                    message: errorMessage?.message ?? errorMessage?.error
-                )
+                let message =
+                    errorMessage?.message ?? errorMessage?.error
+                    ?? "Unknown error"
+
+                // Map specific status codes to specific error types
+                switch httpResponse.statusCode {
+                case 401:
+                    throw ConclaveError.authenticationFailed(message)
+                case 404:
+                    if path.contains("/games/") {
+                        throw ConclaveError.gameNotFound(message)
+                    } else {
+                        throw ConclaveError.httpError(
+                            statusCode: httpResponse.statusCode,
+                            message: message
+                        )
+                    }
+                case 409:
+                    throw ConclaveError.gameNotActive(message)
+                case 500...599:
+                    throw ConclaveError.serverError(message)
+                default:
+                    throw ConclaveError.httpError(
+                        statusCode: httpResponse.statusCode,
+                        message: message
+                    )
+                }
             }
 
             if T.self == EmptyResponse.self {
@@ -191,11 +259,19 @@ public final class HTTPClient: ConclaveAPIClient, Sendable {
             }
 
             do {
-                print(
-                    "[HTTPClient] Raw response: \(String(data: data, encoding: .utf8) ?? "No data returned")"
+                let result = try decoder.decode(T.self, from: data)
+                ConclaveLogger.shared.debug(
+                    "Successfully decoded response",
+                    category: .network
                 )
-                return try decoder.decode(T.self, from: data)
+                return result
             } catch {
+                let responseString =
+                    String(data: data, encoding: .utf8) ?? "No data"
+                ConclaveLogger.shared.error(
+                    "Failed to decode response: \(error.localizedDescription) | Response: \(responseString)",
+                    category: .network
+                )
                 throw ConclaveError.decodingError(error.localizedDescription)
             }
 

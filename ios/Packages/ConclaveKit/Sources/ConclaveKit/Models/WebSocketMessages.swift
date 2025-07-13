@@ -19,26 +19,78 @@ public enum WebSocketMessage {
     }
 }
 
-public struct ClientMessage: Codable {
-    public let action: String
-    public let playerId: UUID?
-    public let changeAmount: Int32?
-    public let clerkUserId: String?
+public enum ClientMessage: Codable, Sendable {
+    case updateLife(playerId: UUID, changeAmount: Int32)
+    case joinGame(clerkUserId: String)
+    case leaveGame(playerId: UUID)
+    case getGameState
+    case endGame
 
-    public init(
-        action: WebSocketMessage.ClientAction,
-        playerId: UUID? = nil,
-        changeAmount: Int32? = nil,
-        clerkUserId: String? = nil
-    ) {
-        self.action = action.rawValue
-        self.playerId = playerId
-        self.changeAmount = changeAmount
-        self.clerkUserId = clerkUserId
+    private enum CodingKeys: String, CodingKey {
+        case action
+        case playerId
+        case changeAmount
+        case clerkUserId
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let action = try container.decode(String.self, forKey: .action)
+
+        switch action {
+        case "updateLife":
+            let playerId = try container.decode(UUID.self, forKey: .playerId)
+            let changeAmount = try container.decode(
+                Int32.self,
+                forKey: .changeAmount
+            )
+            self = .updateLife(playerId: playerId, changeAmount: changeAmount)
+        case "joinGame":
+            let clerkUserId = try container.decode(
+                String.self,
+                forKey: .clerkUserId
+            )
+            self = .joinGame(clerkUserId: clerkUserId)
+        case "leaveGame":
+            let playerId = try container.decode(UUID.self, forKey: .playerId)
+            self = .leaveGame(playerId: playerId)
+        case "getGameState":
+            self = .getGameState
+        case "endGame":
+            self = .endGame
+        default:
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(
+                    codingPath: decoder.codingPath,
+                    debugDescription: "Unknown action: \(action)"
+                )
+            )
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+
+        switch self {
+        case .updateLife(let playerId, let changeAmount):
+            try container.encode("updateLife", forKey: .action)
+            try container.encode(playerId, forKey: .playerId)
+            try container.encode(changeAmount, forKey: .changeAmount)
+        case .joinGame(let clerkUserId):
+            try container.encode("joinGame", forKey: .action)
+            try container.encode(clerkUserId, forKey: .clerkUserId)
+        case .leaveGame(let playerId):
+            try container.encode("leaveGame", forKey: .action)
+            try container.encode(playerId, forKey: .playerId)
+        case .getGameState:
+            try container.encode("getGameState", forKey: .action)
+        case .endGame:
+            try container.encode("endGame", forKey: .action)
+        }
     }
 }
 
-public enum ServerMessage: Codable {
+public enum ServerMessage: Codable, Sendable {
     case lifeUpdate(LifeUpdateMessage)
     case playerJoined(PlayerJoinedMessage)
     case playerLeft(PlayerLeftMessage)
@@ -95,7 +147,7 @@ public enum ServerMessage: Codable {
     }
 }
 
-public struct LifeUpdateMessage: Codable {
+public struct LifeUpdateMessage: Codable, Sendable {
     public let type: String
     public let gameId: UUID
     public let playerId: UUID
@@ -116,7 +168,7 @@ public struct LifeUpdateMessage: Codable {
     }
 }
 
-public struct PlayerJoinedMessage: Codable {
+public struct PlayerJoinedMessage: Codable, Sendable {
     public let type: String
     public let gameId: UUID
     public let player: Player
@@ -128,7 +180,7 @@ public struct PlayerJoinedMessage: Codable {
     }
 }
 
-public struct PlayerLeftMessage: Codable {
+public struct PlayerLeftMessage: Codable, Sendable {
     public let type: String
     public let gameId: UUID
     public let playerId: UUID
@@ -140,7 +192,7 @@ public struct PlayerLeftMessage: Codable {
     }
 }
 
-public struct GameStartedMessage: Codable {
+public struct GameStartedMessage: Codable, Sendable {
     public let type: String
     public let gameId: UUID
     public let players: [Player]
@@ -152,7 +204,7 @@ public struct GameStartedMessage: Codable {
     }
 }
 
-public struct GameEndedMessage: Codable {
+public struct GameEndedMessage: Codable, Sendable {
     public let type: String
     public let gameId: UUID
     public let winner: Player?
@@ -164,7 +216,7 @@ public struct GameEndedMessage: Codable {
     }
 }
 
-public struct ErrorMessage: Codable {
+public struct ErrorMessage: Codable, Sendable {
     public let type: String
     public let message: String
 

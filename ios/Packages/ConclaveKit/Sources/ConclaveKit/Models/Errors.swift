@@ -10,7 +10,53 @@ public enum ConclaveError: Error, LocalizedError, Equatable, Sendable {
     case notConnected
     case connectionFailed(String)
     case timeout
+    case gameNotFound(String)
+    case playerNotFound(String)
+    case gameNotActive(String)
+    case authenticationFailed(String)
+    case serverError(String)
     case unknown(String)
+
+    // MARK: - Recovery Information
+
+    public var isRecoverable: Bool {
+        switch self {
+        case .networkError:
+            return true
+        case .httpError(let statusCode, _):
+            return statusCode >= 500 || statusCode == 429  // Server errors and rate limits
+        case .notConnected, .connectionFailed:
+            return true
+        case .timeout:
+            return true
+        case .decodingError, .encodingError, .invalidURL:
+            return false  // Programming errors
+        case .gameNotFound, .playerNotFound, .gameNotActive,
+            .authenticationFailed:
+            return false  // Business logic errors
+        case .webSocketError, .serverError:
+            return true
+        case .unknown:
+            return true
+        }
+    }
+
+    public var retryDelay: TimeInterval? {
+        switch self {
+        case .networkError:
+            return 2.0
+        case .httpError(let statusCode, _):
+            return statusCode == 429 ? 5.0 : (statusCode >= 500 ? 3.0 : nil)
+        case .notConnected, .connectionFailed:
+            return 1.0
+        case .timeout:
+            return 1.5
+        case .webSocketError, .serverError:
+            return 2.0
+        default:
+            return nil
+        }
+    }
 
     public var errorDescription: String? {
         switch self {
@@ -32,6 +78,16 @@ public enum ConclaveError: Error, LocalizedError, Equatable, Sendable {
             return "Connection failed: \(message)"
         case .timeout:
             return "Request timed out"
+        case .gameNotFound(let message):
+            return "Game not found: \(message)"
+        case .playerNotFound(let message):
+            return "Player not found: \(message)"
+        case .gameNotActive(let message):
+            return "Game not active: \(message)"
+        case .authenticationFailed(let message):
+            return "Authentication failed: \(message)"
+        case .serverError(let message):
+            return "Server error: \(message)"
         case .unknown(let message):
             return "Unknown error: \(message)"
         }
