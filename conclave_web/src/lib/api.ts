@@ -14,13 +14,13 @@ export interface Game {
     id: string;
     name: string;
     status: string;
-    starting_life: number;
-    created_at: string;
-    finished_at?: string;
+    startingLife: number;
+    createdAt: string;
+    finishedAt?: string;
 }
 
 export interface UserInfo {
-    clerk_user_id: string;
+    clerkUserId: string;
 }
 
 export interface GameWithUsers {
@@ -30,26 +30,26 @@ export interface GameWithUsers {
 
 export interface Player {
     id: string;
-    game_id: string;
-    clerk_user_id: string;
-    current_life: number;
+    gameId: string;
+    clerkUserId: string;
+    currentLife: number;
     position: number;
-    is_eliminated: boolean;
+    isEliminated: boolean;
 }
 
 export interface LifeChange {
     id: string;
-    game_id: string;
-    player_id: string;
-    change_amount: number;
-    new_life_total: number;
-    created_at: string;
+    gameId: string;
+    playerId: string;
+    changeAmount: number;
+    newLifeTotal: number;
+    createdAt: string;
 }
 
 export interface GameState {
     game: Game;
     players: Player[];
-    recent_changes: LifeChange[];
+    recentChanges: LifeChange[];
 }
 
 export interface GameWithPlayers {
@@ -65,17 +65,17 @@ export interface GameHistory {
 // Request types
 export interface CreateGameRequest {
     name: string;
-    starting_life?: number;
-    clerk_user_id: string;
+    startingLife?: number;
+    clerkUserId: string;
 }
 
 export interface JoinGameRequest {
-    clerk_user_id: string;
+    clerkUserId: string;
 }
 
 export interface UpdateLifeRequest {
-    player_id: string;
-    change_amount: number;
+    playerId: string;
+    changeAmount: number;
 }
 
 // API functions
@@ -143,7 +143,7 @@ export const healthApi = {
         return response.data;
     },
 
-    getStats: async (): Promise<{ active_games: number; service: string }> => {
+    getStats: async (): Promise<{ activeGames: number; service: string }> => {
         const response = await api.get('/stats');
         return response.data;
     },
@@ -152,7 +152,7 @@ export const healthApi = {
 // WebSocket utilities
 export const createWebSocketUrl = (gameId: string, clerkUserId: string): string => {
     const wsUrl = API_BASE_URL.replace('http://', 'ws://').replace('https://', 'wss://');
-    return `${wsUrl}/ws?game_id=${gameId}&clerk_user_id=${encodeURIComponent(clerkUserId)}`;
+    return `${wsUrl}/ws?gameId=${gameId}&clerkUserId=${encodeURIComponent(clerkUserId)}`;
 };
 
 export default api; 

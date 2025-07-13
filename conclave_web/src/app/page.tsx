@@ -102,8 +102,8 @@ export default function Dashboard() {
 
     createGameMutation.mutate({
       name: gameName.trim(),
-      starting_life: startingLife,
-      clerk_user_id: user.id,
+      startingLife: startingLife,
+      clerkUserId: user.id,
     });
   };
 
@@ -113,7 +113,7 @@ export default function Dashboard() {
     joinGameMutation.mutate({
       gameId,
       data: {
-        clerk_user_id: user.id,
+        clerkUserId: user.id,
       },
     });
   };
@@ -125,14 +125,14 @@ export default function Dashboard() {
       leaveGameMutation.mutate({
         gameId,
         data: {
-          clerk_user_id: user.id,
+          clerkUserId: user.id,
         },
       });
     }
   };
 
   const isUserInGame = (game: GameWithUsers) => {
-    return game.users.some(u => u.clerk_user_id === user?.id);
+    return game.users.some(u => u.clerkUserId === user?.id);
   };
 
   const getGameStatusBadge = (status: string) => {
@@ -273,7 +273,7 @@ export default function Dashboard() {
                         <div>
                           <CardTitle className="text-lg">{game.name}</CardTitle>
                           <CardDescription>
-                            Created {format(new Date(game.created_at), "MMM d, yyyy 'at' h:mm a")}
+                            Created {format(new Date(game.createdAt), "MMM d, yyyy 'at' h:mm a")}
                           </CardDescription>
                         </div>
                         {getGameStatusBadge(game.status)}
@@ -285,7 +285,7 @@ export default function Dashboard() {
                           <Users className="h-4 w-4" />
                           <span>{gameWithUsers.users.length} player{gameWithUsers.users.length !== 1 ? 's' : ''}</span>
                           <span>•</span>
-                          <span>{game.starting_life} starting life</span>
+                          <span>{game.startingLife} starting life</span>
                         </div>
 
                         <div className="flex gap-2">
@@ -378,7 +378,7 @@ export default function Dashboard() {
                         <div>
                           <CardTitle className="text-lg">{game.name}</CardTitle>
                           <CardDescription>
-                            Created {format(new Date(game.created_at), "MMM d, yyyy 'at' h:mm a")}
+                            Created {format(new Date(game.createdAt), "MMM d, yyyy 'at' h:mm a")}
                           </CardDescription>
                         </div>
                         <Badge variant="default">Active</Badge>
@@ -390,7 +390,7 @@ export default function Dashboard() {
                           <Users className="h-4 w-4" />
                           <span>{gameWithUsers.users.length}/8 players</span>
                           <span>•</span>
-                          <span>{game.starting_life} starting life</span>
+                          <span>{game.startingLife} starting life</span>
                         </div>
 
                         <Button
@@ -437,7 +437,7 @@ export default function Dashboard() {
               {gameHistory.games.map((gameWithPlayers) => {
                 const game = gameWithPlayers.game;
                 const winner = gameWithPlayers.winner;
-                const userWon = winner?.clerk_user_id === user.id;
+                const userWon = winner?.clerkUserId === user.id;
 
                 return (
                   <Card key={game.id}>
@@ -446,7 +446,7 @@ export default function Dashboard() {
                         <div>
                           <CardTitle className="text-lg">{game.name}</CardTitle>
                           <CardDescription>
-                            Finished {game.finished_at ? format(new Date(game.finished_at), "MMM d, yyyy 'at' h:mm a") : 'Recently'}
+                            Finished {game.finishedAt ? format(new Date(game.finishedAt), "MMM d, yyyy 'at' h:mm a") : 'Recently'}
                           </CardDescription>
                         </div>
                         <div className="flex items-center gap-2">
@@ -462,7 +462,7 @@ export default function Dashboard() {
                         <div className="flex items-center gap-4 text-sm text-muted-foreground">
                           <span>{gameWithPlayers.players.length} players</span>
                           <span>•</span>
-                          <span>{game.starting_life} starting life</span>
+                          <span>{game.startingLife} starting life</span>
                           {winner && (
                             <>
                               <span>•</span>

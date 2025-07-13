@@ -6,12 +6,10 @@ import { useUser } from "@clerk/nextjs";
 import {
     gameApi,
     type GameState,
-    type Player,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import {
     Heart,
     Users,
@@ -101,7 +99,7 @@ export default function FinishedGamePage() {
 
     const { game, players } = gameState;
     const winner = players.length > 0 ? players.reduce((prev, current) =>
-        (prev.current_life > current.current_life) ? prev : current
+        (prev.currentLife > current.currentLife) ? prev : current
     ) : null;
 
     return (
@@ -122,12 +120,12 @@ export default function FinishedGamePage() {
                             <h1 className="text-2xl font-bold">{game.name}</h1>
                             <p className="text-muted-foreground">
                                 {players.length} player{players.length !== 1 ? "s" : ""} •{" "}
-                                {game.starting_life} starting life • Finished Game
+                                {game.startingLife} starting life • Finished Game
                             </p>
-                            {game.finished_at && (
+                            {game.finishedAt && (
                                 <p className="text-sm text-muted-foreground">
                                     <Calendar className="h-4 w-4 inline mr-1" />
-                                    Finished {format(new Date(game.finished_at), "PPp")}
+                                    Finished {format(new Date(game.finishedAt), "PPp")}
                                 </p>
                             )}
                         </div>
@@ -174,7 +172,7 @@ export default function FinishedGamePage() {
                                         <div>
                                             <span className="font-semibold">
                                                 Player {winner.position}
-                                                {winner.clerk_user_id === user?.id && " (You)"}
+                                                {winner.clerkUserId === user?.id && " (You)"}
                                             </span>
                                             <Badge variant="default" className="ml-2">
                                                 Winner
@@ -183,7 +181,7 @@ export default function FinishedGamePage() {
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <Heart className="h-4 w-4 text-red-400" />
-                                        <span className="font-bold text-lg">{winner.current_life}</span>
+                                        <span className="font-bold text-lg">{winner.currentLife}</span>
                                     </div>
                                 </div>
                             )}
@@ -194,7 +192,7 @@ export default function FinishedGamePage() {
                                     Final Rankings
                                 </h4>
                                 {players
-                                    .sort((a, b) => b.current_life - a.current_life)
+                                    .sort((a, b) => b.currentLife - a.currentLife)
                                     .filter(player => player.id !== winner?.id)
                                     .map((player, index) => (
                                         <div
@@ -207,13 +205,13 @@ export default function FinishedGamePage() {
                                                 </span>
                                                 <span>
                                                     Player {player.position}
-                                                    {player.clerk_user_id === user?.id && " (You)"}
+                                                    {player.clerkUserId === user?.id && " (You)"}
                                                 </span>
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 <Heart className="h-4 w-4 text-red-400" />
                                                 <span className="font-semibold">
-                                                    {player.current_life}
+                                                    {player.currentLife}
                                                 </span>
                                             </div>
                                         </div>
@@ -227,7 +225,7 @@ export default function FinishedGamePage() {
             {/* Players Grid - Historical View */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 mb-6">
                 {players.map((player) => {
-                    const isCurrentUser = player.clerk_user_id === user?.id;
+                    const isCurrentUser = player.clerkUserId === user?.id;
                     const isWinner = winner?.id === player.id;
 
                     return (
@@ -236,7 +234,7 @@ export default function FinishedGamePage() {
                             className={`
                 ${isCurrentUser ? "ring-2 ring-blue-500" : ""}
                 ${isWinner ? "ring-2 ring-yellow-500 bg-yellow-50" : ""}
-                ${player.current_life <= 0 ? "border-red-300" : ""}
+                ${player.currentLife <= 0 ? "border-red-300" : ""}
               `}
                         >
                             <CardHeader className="pb-3">
@@ -258,14 +256,14 @@ export default function FinishedGamePage() {
                                 <div className="text-center">
                                     <div className="flex items-center justify-center gap-2">
                                         <Heart
-                                            className={`h-6 w-6 ${player.current_life <= 0 ? "text-red-500" : "text-red-400"
+                                            className={`h-6 w-6 ${player.currentLife <= 0 ? "text-red-500" : "text-red-400"
                                                 }`}
                                         />
                                         <span
-                                            className={`text-3xl font-bold ${player.current_life <= 0 ? "text-red-500" : ""
+                                            className={`text-3xl font-bold ${player.currentLife <= 0 ? "text-red-500" : ""
                                                 }`}
                                         >
-                                            {player.current_life}
+                                            {player.currentLife}
                                         </span>
                                     </div>
                                     <p className="text-sm text-muted-foreground mt-2">
@@ -300,13 +298,13 @@ export default function FinishedGamePage() {
 
                             <div className="flex justify-between">
                                 <span>Starting Life:</span>
-                                <span className="font-semibold">{game.starting_life}</span>
+                                <span className="font-semibold">{game.startingLife}</span>
                             </div>
-                            {game.finished_at && (
+                            {game.finishedAt && (
                                 <div className="flex justify-between">
                                     <span>Finished At:</span>
                                     <span className="font-semibold">
-                                        {format(new Date(game.finished_at), "PPp")}
+                                        {format(new Date(game.finishedAt), "PPp")}
                                     </span>
                                 </div>
                             )}

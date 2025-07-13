@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import useWebSocket, { ReadyState } from 'react-use-websocket';
@@ -13,7 +13,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import {
     Heart,
@@ -22,7 +21,6 @@ import {
     Users,
     ArrowLeft,
     LogOut,
-    Crown,
 } from "lucide-react";
 
 interface WebSocketMessage {
@@ -125,23 +123,8 @@ export default function LiveGamePage() {
         fetchGameState();
     }, [gameId, router]);
 
-    // Handle incoming WebSocket messages
-    useEffect(() => {
-        if (lastMessage !== null) {
-            try {
-                console.log("Raw WebSocket message received:", lastMessage.data);
-                const message: WebSocketMessage = JSON.parse(lastMessage.data);
-                handleWebSocketMessage(message);
-            } catch (error) {
-                console.error("Failed to parse WebSocket message:", error);
-                console.error("Raw message data:", lastMessage.data);
-            }
-        }
-    }, [lastMessage]);
-
-    const handleWebSocketMessage = (message: WebSocketMessage) => {
+    const handleWebSocketMessage = useCallback((message: WebSocketMessage) => {
         console.log("Received WebSocket message:", message);
-        console.log("Current gameState players before update:", gameState?.players);
 
         switch (message.type) {
             case "lifeUpdate":
@@ -154,23 +137,23 @@ export default function LiveGamePage() {
                             return prev;
                         }
 
-                        console.log("📊 Previous players state:", prev.players.map(p => ({ id: p.id, life: p.current_life, position: p.position })));
+                        console.log("📊 Previous players state:", prev.players.map(p => ({ id: p.id, life: p.currentLife, position: p.position })));
 
                         const updatedState = {
                             ...prev,
                             players: prev.players.map((p) => {
                                 if (p.id === message.playerId) {
-                                    console.log(`✅ Updating player ${p.position} (${p.id}) from ${p.current_life} to ${message.newLife}`);
+                                    console.log(`✅ Updating player ${p.position} (${p.id}) from ${p.currentLife} to ${message.newLife}`);
                                     return {
                                         ...p,
-                                        current_life: message.newLife!,
+                                        currentLife: message.newLife!,
                                     };
                                 }
                                 return p;
                             }),
                         };
 
-                        console.log("📊 Updated players state:", updatedState.players.map(p => ({ id: p.id, life: p.current_life, position: p.position })));
+                        console.log("📊 Updated players state:", updatedState.players.map(p => ({ id: p.id, life: p.currentLife, position: p.position })));
                         return updatedState;
                     });
 
@@ -263,7 +246,21 @@ export default function LiveGamePage() {
             default:
                 console.log("Unknown message type:", message.type);
         }
-    };
+    }, [gameId, router]);
+
+    // Handle incoming WebSocket messages
+    useEffect(() => {
+        if (lastMessage !== null) {
+            try {
+                console.log("Raw WebSocket message received:", lastMessage.data);
+                const message: WebSocketMessage = JSON.parse(lastMessage.data);
+                handleWebSocketMessage(message);
+            } catch (error) {
+                console.error("Failed to parse WebSocket message:", error);
+                console.error("Raw message data:", lastMessage.data);
+            }
+        }
+    }, [lastMessage, handleWebSocketMessage]);
 
     const handleLifeChange = async (playerId: string, changeAmount: number) => {
         if (!isConnected) {
@@ -292,7 +289,7 @@ export default function LiveGamePage() {
 
         if (confirm("Are you sure you want to leave this game?")) {
             try {
-                await gameApi.leave(gameId, { clerk_user_id: user.id });
+                await gameApi.leave(gameId, { clerkUserId: user.id });
                 toast.success("Left game successfully");
                 router.push("/");
             } catch (error) {
@@ -324,7 +321,7 @@ export default function LiveGamePage() {
 
     const getCurrentUserPlayer = (): Player | null => {
         if (!gameState || !user) return null;
-        return gameState.players.find((p) => p.clerk_user_id === user.id) || null;
+        return gameState.players.find((p) => p.clerkUserId === user.id) || null;
     };
 
     const isUserInGame = () => {
@@ -389,7 +386,7 @@ export default function LiveGamePage() {
                             <h1 className="text-2xl font-bold">{game.name}</h1>
                             <p className="text-muted-foreground">
                                 {players.length} player{players.length !== 1 ? "s" : ""} •{" "}
-                                {game.starting_life} starting life • Live Game
+                                {game.startingLife} starting life • Live Game
                             </p>
                         </div>
                     </div>
@@ -424,14 +421,14 @@ export default function LiveGamePage() {
             {/* Players Grid */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {players.map((player) => {
-                    const isCurrentUser = player.clerk_user_id === user?.id;
+                    const isCurrentUser = player.clerkUserId === user?.id;
 
                     return (
                         <Card
                             key={player.id}
                             className={`
                 ${isCurrentUser ? "ring-2 ring-blue-500" : ""}
-                ${player.current_life <= 0 ? "border-red-300" : ""}
+                ${player.currentLife <= 0 ? "border-red-300" : ""}
               `}
                         >
                             <CardHeader className="pb-3">
@@ -450,12 +447,12 @@ export default function LiveGamePage() {
                                 <div className="text-center space-y-4">
                                     <div className="flex items-center justify-center gap-2">
                                         <Heart
-                                            className={`h-6 w-6 ${player.current_life <= 0 ? "text-red-500" : "text-red-400"}`}
+                                            className={`h-6 w-6 ${player.currentLife <= 0 ? "text-red-500" : "text-red-400"}`}
                                         />
                                         <span
-                                            className={`text-3xl font-bold ${player.current_life <= 0 ? "text-red-500" : ""}`}
+                                            className={`text-3xl font-bold ${player.currentLife <= 0 ? "text-red-500" : ""}`}
                                         >
-                                            {player.current_life}
+                                            {player.currentLife}
                                         </span>
                                     </div>
 
