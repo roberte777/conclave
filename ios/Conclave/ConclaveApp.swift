@@ -17,7 +17,7 @@ struct ConclaveApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            NavigationRootView()
                 .environment(conclave)
         }
     }
