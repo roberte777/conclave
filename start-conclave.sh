@@ -30,7 +30,7 @@ tmux rename-window -t "$SESSION_NAME:0" "backend"
 # Set up the backend pane (Rust API)
 echo "🦀 Setting up Rust backend..."
 tmux send-keys -t "$SESSION_NAME:backend" "cd conclave_api" Enter
-tmux send-keys -t "$SESSION_NAME:backend" "echo '🦀 Starting Rust backend on http://localhost:3000...'" Enter
+tmux send-keys -t "$SESSION_NAME:backend" "echo '🦀 Starting Rust backend on http://localhost:3001...'" Enter
 tmux send-keys -t "$SESSION_NAME:backend" "cargo run" Enter
 
 # Create a new window for the frontend
@@ -38,7 +38,7 @@ echo "⚛️  Setting up Next.js frontend..."
 tmux new-window -t "$SESSION_NAME" -n "frontend" -c "$PROJECT_ROOT/conclave_web"
 tmux send-keys -t "$SESSION_NAME:frontend" "echo '⚛️  Starting Next.js frontend...'" Enter
 tmux send-keys -t "$SESSION_NAME:frontend" "echo '📝 Make sure to set up your .env.local with Clerk keys!'" Enter
-tmux send-keys -t "$SESSION_NAME:frontend" "echo '🔗 Frontend will be available at http://localhost:3001 (or next available port)'" Enter
+tmux send-keys -t "$SESSION_NAME:frontend" "echo '🔗 Frontend will be available at http://localhost:3000 (or next available port)'" Enter
 tmux send-keys -t "$SESSION_NAME:frontend" "bun run dev" Enter
 
 # Create a new window for general commands/logs
