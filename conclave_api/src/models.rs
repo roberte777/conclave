@@ -38,6 +38,7 @@ pub struct LifeChange {
 
 // Request/Response DTOs
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateGameRequest {
     pub name: String,
     pub starting_life: Option<i32>, // Default to 20 if not provided
@@ -45,11 +46,13 @@ pub struct CreateGameRequest {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct JoinGameRequest {
     pub clerk_user_id: String, // Clerk user ID
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UpdateLifeRequest {
     pub player_id: Uuid,
     pub change_amount: i32,

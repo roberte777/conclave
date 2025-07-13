@@ -116,8 +116,7 @@ async fn join_game_in_tx(
     let player_count: i64 = player_count_result.get("count");
     if player_count >= MAX_PLAYERS_PER_GAME as i64 {
         return Err(ApiError::BadRequest(format!(
-            "Game is full (max {} players)",
-            MAX_PLAYERS_PER_GAME
+            "Game is full (max {MAX_PLAYERS_PER_GAME} players)"
         )));
     }
 
