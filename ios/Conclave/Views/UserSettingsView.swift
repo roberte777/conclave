@@ -1,10 +1,3 @@
-//
-//  UserSettingsView.swift
-//  TestingPractice
-//
-//  Created by Colby Deason on 7/13/25.
-//
-
 import SwiftUI
 
 // Eventually might be a "drawer"

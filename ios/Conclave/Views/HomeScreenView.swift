@@ -1,44 +1,37 @@
-//
-//  HomeScreenView.swift
-//  TestingPractice
-//
-//  Created by Colby Deason on 7/13/25.
-//
-
 import SwiftUI
 
 struct HomeScreenView: View {
     @Binding var screenPath: NavigationPath
-    
+
     var body: some View {
-        ZStack{
-            VStack(alignment: .leading, spacing: 16){
+        ZStack {
+            VStack(alignment: .leading, spacing: 16) {
                 Text("Conclave")
                     .font(.largeTitle)
                     .foregroundStyle(.primary)
                     .padding(75)
                 Spacer()
             }
-            
-            VStack{
-                HStack{
+
+            VStack {
+                HStack {
                     Spacer()
                     Button(action: {
                         print("path before \(screenPath)")
                         screenPath.append(Screen.userSettings)
                         print("path after\(screenPath)")
-                    }){
+                    }) {
                         Image(systemName: "person.circle")
-                                                    .resizable()
-                                                    .frame(width: 30, height: 30)
-                                                    .foregroundColor(.primary)
-                                                    .padding()
+                            .resizable()
+                            .frame(width: 30, height: 30)
+                            .foregroundColor(.primary)
+                            .padding()
                     }
                 }
                 Spacer()
             }
-            
-            VStack{
+
+            VStack {
                 Text("Offline Game")
                     .font(.title)
                     .foregroundStyle(.primary)

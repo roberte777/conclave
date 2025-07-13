@@ -1,29 +1,22 @@
-//
-//  FourPlayerGameView.swift
-//  TestingPractice
-//
-//  Created by Colby Deason on 7/13/25.
-//
-
 import SwiftUI
 
 struct FourPlayerGameView: View {
     @Binding var screenPath: NavigationPath
-    
+
     var body: some View {
-        ZStack{
-            VStack{
-                HStack{
+        ZStack {
+            VStack {
+                HStack {
                     UserHealthView(.blue, isFlipped: true)
                     UserHealthView(.red, isFlipped: true)
                 }
-                HStack{
+                HStack {
                     UserHealthView(.green, isFlipped: true)
                     UserHealthView(.yellow, isFlipped: true)
                 }
             }
             .padding()
-            
+
             Button(action: {
                 screenPath = NavigationPath()
             }) {
