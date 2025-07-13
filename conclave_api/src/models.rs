@@ -4,6 +4,7 @@ use sqlx::FromRow;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[serde(rename_all = "camelCase")]
 pub struct Game {
     pub id: Uuid,
     pub name: String,
@@ -14,6 +15,7 @@ pub struct Game {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[serde(rename_all = "camelCase")]
 pub struct Player {
     pub id: Uuid,
     pub game_id: Uuid,
@@ -24,6 +26,7 @@ pub struct Player {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[serde(rename_all = "camelCase")]
 pub struct LifeChange {
     pub id: Uuid,
     pub game_id: Uuid,
