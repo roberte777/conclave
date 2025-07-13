@@ -316,11 +316,11 @@ public final class WebSocketClient: ConclaveWebSocketClient, Sendable {
         components?.path = "/ws"
         components?.queryItems = [
             URLQueryItem(
-                name: "game_id",
+                name: "gameId",
                 value: connectionInfo.gameId.uuidString
             ),
             URLQueryItem(
-                name: "clerk_user_id",
+                name: "clerkUserId",
                 value: connectionInfo.clerkUserId
             ),
         ]
