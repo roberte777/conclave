@@ -38,6 +38,7 @@ pub struct LifeChange {
 
 // Request/Response DTOs
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateGameRequest {
     pub name: String,
     pub starting_life: Option<i32>, // Default to 20 if not provided
@@ -45,11 +46,13 @@ pub struct CreateGameRequest {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct JoinGameRequest {
     pub clerk_user_id: String, // Clerk user ID
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UpdateLifeRequest {
     pub player_id: Uuid,
     pub change_amount: i32,
@@ -57,11 +60,13 @@ pub struct UpdateLifeRequest {
 
 // Helper struct for representing user info from Clerk
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UserInfo {
     pub clerk_user_id: String,
 }
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct GameState {
     pub game: Game,
     pub players: Vec<Player>,
@@ -69,11 +74,13 @@ pub struct GameState {
 }
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct GameHistory {
     pub games: Vec<GameWithPlayers>,
 }
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct GameWithPlayers {
     pub game: Game,
     pub players: Vec<Player>,
@@ -81,6 +88,7 @@ pub struct GameWithPlayers {
 }
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct GameWithUsers {
     pub game: Game,
     pub users: Vec<UserInfo>, // User info from players
@@ -88,6 +96,7 @@ pub struct GameWithUsers {
 
 // Result type for game ending operations
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct GameEndResult {
     pub winner: Option<Player>,
 }

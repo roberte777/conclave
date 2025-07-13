@@ -230,7 +230,7 @@ pub async fn get_stats(State(state): State<AppState>) -> Result<Json<serde_json:
     let count: i64 = active_games_count.get("count");
 
     Ok(Json(serde_json::json!({
-        "active_games": count,
+        "activeGames": count,
         "service": "conclave-api"
     })))
 }

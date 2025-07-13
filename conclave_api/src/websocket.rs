@@ -17,6 +17,7 @@ use tracing::{error, info};
 use uuid::Uuid;
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WebSocketQuery {
     pub game_id: Uuid,
     pub clerk_user_id: String,

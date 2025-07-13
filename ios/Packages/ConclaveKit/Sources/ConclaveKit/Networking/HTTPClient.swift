@@ -3,7 +3,7 @@ import Foundation
 /// High-performance HTTP client with automatic error handling and request optimization
 ///
 /// Features:
-/// - Automatic JSON encoding/decoding with snake_case conversion
+/// - Automatic JSON encoding/decoding with camelCase format
 /// - Enhanced error mapping with recovery information
 /// - Request caching and deduplication for GET requests
 /// - Comprehensive logging and performance monitoring
@@ -22,7 +22,7 @@ public final class HTTPClient: ConclaveAPIClient, Sendable {
         self.session = session
 
         self.decoder = JSONDecoder()
-        self.decoder.keyDecodingStrategy = .convertFromSnakeCase
+        self.decoder.keyDecodingStrategy = .useDefaultKeys
         self.decoder.dateDecodingStrategy = .custom { decoder in
             let container = try decoder.singleValueContainer()
             let dateString = try container.decode(String.self)
@@ -50,7 +50,7 @@ public final class HTTPClient: ConclaveAPIClient, Sendable {
         }
 
         self.encoder = JSONEncoder()
-        self.encoder.keyEncodingStrategy = .convertToSnakeCase
+        self.encoder.keyEncodingStrategy = .useDefaultKeys
         self.encoder.dateEncodingStrategy = .custom { date, encoder in
             let formatter = ISO8601DateFormatter()
             formatter.formatOptions = [
