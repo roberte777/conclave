@@ -140,7 +140,7 @@ public class ConclaveClientManager {
 
             // Reload game to get updated state
             if currentGame?.id == gameId {
-                try await loadGame(gameId: gameId)
+                _ = try await loadGame(gameId: gameId)
             }
 
             setLoading(false)
@@ -163,7 +163,7 @@ public class ConclaveClientManager {
             // Clear current player if leaving current game
             if currentGame?.id == gameId {
                 currentPlayer = nil
-                try await loadGame(gameId: gameId)
+                _ = try await loadGame(gameId: gameId)
             }
 
             setLoading(false)
