@@ -26,26 +26,38 @@ struct UserHealthView: View {
         @Binding var givenHealthTotal: Int
         var isFlipped: Bool
         var body: some View {
-            Color
-                .clear
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    if isFlipped {
-                        givenHealthTotal += 1
-                    } else {
-                        givenHealthTotal -= 1
+            ZStack{
+                Color
+                    .clear
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        if isFlipped {
+                            givenHealthTotal += 1
+                        } else {
+                            givenHealthTotal -= 1
+                        }
                     }
-                }
-            Color
-                .clear
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    if isFlipped {
-                        givenHealthTotal -= 1
-                    } else {
-                        givenHealthTotal += 1
+                Image(systemName: isFlipped ? "plus" : "minus")
+                    .foregroundColor(.white)
+                    .fontWeight(.bold)
+                    .padding(10)
+            }
+            ZStack{
+                Color
+                    .clear
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        if isFlipped {
+                            givenHealthTotal -= 1
+                        } else {
+                            givenHealthTotal += 1
+                        }
                     }
-                }
+                Image(systemName: isFlipped ? "minus" : "plus")
+                    .foregroundColor(.white)
+                    .fontWeight(.bold)
+                    .padding(10)
+            }
         }
 
     }
