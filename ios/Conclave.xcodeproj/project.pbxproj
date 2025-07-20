@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		07932E242E231BF400844D2B /* ConclaveKit in Frameworks */ = {isa = PBXBuildFile; productRef = 07932E232E231BF400844D2B /* ConclaveKit */; };
 		07932E272E231C6200844D2B /* ConclaveKit in Frameworks */ = {isa = PBXBuildFile; productRef = 07932E262E231C6200844D2B /* ConclaveKit */; };
+		07932ECE2E2C7C3B00844D2B /* Clerk in Frameworks */ = {isa = PBXBuildFile; productRef = 07932ECD2E2C7C3B00844D2B /* Clerk */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -57,6 +58,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				07932ECE2E2C7C3B00844D2B /* Clerk in Frameworks */,
 				07932E242E231BF400844D2B /* ConclaveKit in Frameworks */,
 				07932E272E231C6200844D2B /* ConclaveKit in Frameworks */,
 			);
@@ -121,6 +123,7 @@
 			packageProductDependencies = (
 				07932E232E231BF400844D2B /* ConclaveKit */,
 				07932E262E231C6200844D2B /* ConclaveKit */,
+				07932ECD2E2C7C3B00844D2B /* Clerk */,
 			);
 			productName = Conclave;
 			productReference = 07932DF32E23061F00844D2B /* Conclave.app */;
@@ -206,6 +209,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				07932E252E231C6200844D2B /* XCLocalSwiftPackageReference "Packages/ConclaveKit" */,
+				07932ECC2E2C7C3B00844D2B /* XCRemoteSwiftPackageReference "clerk-ios" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 07932DF42E23061F00844D2B /* Products */;
@@ -588,6 +592,17 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		07932ECC2E2C7C3B00844D2B /* XCRemoteSwiftPackageReference "clerk-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/clerk/clerk-ios";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.59.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
 		07932E232E231BF400844D2B /* ConclaveKit */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -596,6 +611,11 @@
 		07932E262E231C6200844D2B /* ConclaveKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = ConclaveKit;
+		};
+		07932ECD2E2C7C3B00844D2B /* Clerk */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 07932ECC2E2C7C3B00844D2B /* XCRemoteSwiftPackageReference "clerk-ios" */;
+			productName = Clerk;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
