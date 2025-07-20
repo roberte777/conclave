@@ -29,3 +29,27 @@ public struct UpdateLifeRequest: Codable, Sendable {
         self.changeAmount = changeAmount
     }
 }
+
+public struct UpdateCommanderDamageRequest: Codable, Sendable {
+    public let fromPlayerId: UUID
+    public let toPlayerId: UUID
+    public let commanderNumber: Int32
+    public let damageAmount: Int32
+
+    public init(fromPlayerId: UUID, toPlayerId: UUID, commanderNumber: Int32, damageAmount: Int32) {
+        self.fromPlayerId = fromPlayerId
+        self.toPlayerId = toPlayerId
+        self.commanderNumber = commanderNumber
+        self.damageAmount = damageAmount
+    }
+}
+
+public struct TogglePartnerRequest: Codable, Sendable {
+    public let playerId: UUID
+    public let enablePartner: Bool
+
+    public init(playerId: UUID, enablePartner: Bool) {
+        self.playerId = playerId
+        self.enablePartner = enablePartner
+    }
+}

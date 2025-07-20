@@ -172,6 +172,24 @@ public final class HTTPClient: ConclaveAPIClient, Sendable {
             method: .GET
         )
     }
+    
+    // MARK: - Commander Damage API Methods
+    
+    public func updateCommanderDamage(gameId: UUID, request: UpdateCommanderDamageRequest) async throws -> CommanderDamage {
+        try await performRequest(
+            path: "/games/\(gameId.uuidString)/commander-damage",
+            method: .PUT,
+            body: request
+        )
+    }
+    
+    public func togglePartner(gameId: UUID, playerId: UUID, request: TogglePartnerRequest) async throws {
+        let _: EmptyResponse = try await performRequest(
+            path: "/games/\(gameId.uuidString)/players/\(playerId.uuidString)/partner",
+            method: .POST,
+            body: request
+        )
+    }
 
     // MARK: - Private Methods
 
