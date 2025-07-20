@@ -24,36 +24,45 @@ struct UserHealthView: View {
 
     struct HealthButtons: View {
         @Binding var givenHealthTotal: Int
-        var isFlipped: Bool
+        @Binding var givenLifeOrientation: LifeOrientation
+
         var body: some View {
-            ZStack{
+            let flipLeftRight =
+                (givenLifeOrientation == .Right
+                    || givenLifeOrientation == .Down)
+            let flipAngle: Double =
+                (givenLifeOrientation == .Right
+                    || givenLifeOrientation == .Left) ? 90 : 0
+            ZStack {
                 Color
                     .clear
                     .contentShape(Rectangle())
                     .onTapGesture {
-                        if isFlipped {
+                        if flipLeftRight {
                             givenHealthTotal += 1
                         } else {
                             givenHealthTotal -= 1
                         }
                     }
-                Image(systemName: isFlipped ? "plus" : "minus")
+                Image(systemName: flipLeftRight ? "plus" : "minus")
+                    .rotationEffect(Angle(degrees: flipAngle))
                     .foregroundColor(.white)
                     .fontWeight(.bold)
                     .padding(10)
             }
-            ZStack{
+            ZStack {
                 Color
                     .clear
                     .contentShape(Rectangle())
                     .onTapGesture {
-                        if isFlipped {
+                        if flipLeftRight {
                             givenHealthTotal -= 1
                         } else {
                             givenHealthTotal += 1
                         }
                     }
-                Image(systemName: isFlipped ? "minus" : "plus")
+                Image(systemName: flipLeftRight ? "minus" : "plus")
+                    .rotationEffect(Angle(degrees: flipAngle))
                     .foregroundColor(.white)
                     .fontWeight(.bold)
                     .padding(10)
@@ -79,14 +88,14 @@ struct UserHealthView: View {
                     VStack(spacing: 0) {
                         HealthButtons(
                             givenHealthTotal: $healthTotal,
-                            isFlipped: lifeOrientation == .Right
+                            givenLifeOrientation: $lifeOrientation
                         )
                     }
                 } else {
                     HStack(spacing: 0) {
                         HealthButtons(
                             givenHealthTotal: $healthTotal,
-                            isFlipped: lifeOrientation == .Down
+                            givenLifeOrientation: $lifeOrientation
                         )
                     }
                 }
