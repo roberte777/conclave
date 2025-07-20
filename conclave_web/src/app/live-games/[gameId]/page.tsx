@@ -9,6 +9,8 @@ import {
     createWebSocketUrl,
     type GameState,
     type Player,
+    type WebSocketMessage,
+    type WebSocketRequest,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,26 +24,8 @@ import {
     ArrowLeft,
     LogOut,
 } from "lucide-react";
+import { CommanderDamageTracker } from "@/components/CommanderDamageTracker";
 
-interface WebSocketMessage {
-    type: string;
-    gameId?: string;
-    playerId?: string;
-    newLife?: number;
-    changeAmount?: number;
-    username?: string;
-    player?: Player;
-    players?: Player[];
-    winner?: Player;
-    message?: string;
-}
-
-interface WebSocketSendMessage {
-    action: string;
-    playerId?: string;
-    changeAmount?: number;
-    clerkUserId?: string;
-}
 
 export default function LiveGamePage() {
     const params = useParams();
@@ -230,9 +214,53 @@ export default function LiveGamePage() {
                         return {
                             ...prev,
                             players: message.players!.sort((a, b) => a.position - b.position),
+                            commanderDamage: message.commanderDamage || prev.commanderDamage || [],
                         };
                     });
                 }
+                break;
+
+            case "commanderDamageUpdate":
+                console.log("🗡️ Processing commander damage update:", message);
+                setGameState((prev) => {
+                    if (!prev) return prev;
+                    
+                    const updatedCommanderDamage = prev.commanderDamage.map((cd) => {
+                        if (
+                            cd.fromPlayerId === message.fromPlayerId &&
+                            cd.toPlayerId === message.toPlayerId &&
+                            cd.commanderNumber === message.commanderNumber
+                        ) {
+                            return {
+                                ...cd,
+                                damage: message.newDamage,
+                            };
+                        }
+                        return cd;
+                    });
+
+                    return {
+                        ...prev,
+                        commanderDamage: updatedCommanderDamage,
+                    };
+                });
+                
+                const changeText = message.damageAmount > 0 
+                    ? `+${message.damageAmount}` 
+                    : `${message.damageAmount}`;
+                toast.info(`Commander damage updated: ${changeText}`);
+                break;
+
+            case "partnerToggled":
+                console.log("👥 Processing partner toggle:", message);
+                setGameState((prev) => {
+                    if (!prev) return prev;
+                    
+                    // The backend handles adding/removing commander damage entries
+                    // We'll get the updated state in a subsequent message or via API
+                    toast.info(`Partner ${message.hasPartner ? 'enabled' : 'disabled'}`);
+                    return prev;
+                });
                 break;
 
             case "error":
@@ -244,7 +272,7 @@ export default function LiveGamePage() {
                 break;
 
             default:
-                console.log("Unknown message type:", message.type);
+                console.log("Unknown message type:", message);
         }
     }, [gameId, router]);
 
@@ -269,7 +297,7 @@ export default function LiveGamePage() {
         }
 
         try {
-            const messageData: WebSocketSendMessage = {
+            const messageData: WebSocketRequest = {
                 action: "updateLife",
                 playerId: playerId,
                 changeAmount: changeAmount,
@@ -304,7 +332,7 @@ export default function LiveGamePage() {
 
         if (confirm("Are you sure you want to end this game?")) {
             try {
-                const messageData: WebSocketSendMessage = {
+                const messageData: WebSocketRequest = {
                     action: "endGame",
                 };
 
@@ -316,6 +344,55 @@ export default function LiveGamePage() {
                 console.error("Failed to end game:", error);
                 toast.error("Failed to end game");
             }
+        }
+    };
+
+    const handleCommanderDamageUpdate = async (
+        fromPlayerId: string,
+        toPlayerId: string,
+        commanderNumber: 1 | 2,
+        damageAmount: number
+    ) => {
+        if (!isConnected) {
+            toast.error("Not connected to game server");
+            return;
+        }
+
+        try {
+            const messageData: WebSocketRequest = {
+                action: "updateCommanderDamage",
+                fromPlayerId,
+                toPlayerId,
+                commanderNumber,
+                damageAmount,
+            };
+
+            console.log(`📤 Sending commander damage update: ${damageAmount} from ${fromPlayerId} to ${toPlayerId} (commander ${commanderNumber})`);
+            sendMessage(JSON.stringify(messageData));
+        } catch (error) {
+            console.error("Failed to update commander damage:", error);
+            toast.error("Failed to update commander damage");
+        }
+    };
+
+    const handlePartnerToggle = async (playerId: string, enablePartner: boolean) => {
+        if (!isConnected) {
+            toast.error("Not connected to game server");
+            return;
+        }
+
+        try {
+            const messageData: WebSocketRequest = {
+                action: "togglePartner",
+                playerId,
+                enablePartner,
+            };
+
+            console.log(`📤 Sending partner toggle: ${enablePartner ? 'enable' : 'disable'} for player ${playerId}`);
+            sendMessage(JSON.stringify(messageData));
+        } catch (error) {
+            console.error("Failed to toggle partner:", error);
+            toast.error("Failed to toggle partner");
         }
     };
 
@@ -503,6 +580,19 @@ export default function LiveGamePage() {
                         </Card>
                     );
                 })}
+            </div>
+
+            {/* Commander Damage Tracker */}
+            <div className="mt-8">
+                <CommanderDamageTracker
+                    gameId={gameId}
+                    players={players}
+                    commanderDamage={gameState.commanderDamage || []}
+                    currentUserId={user?.id || ""}
+                    onUpdateDamage={handleCommanderDamageUpdate}
+                    onTogglePartner={handlePartnerToggle}
+                    isConnected={isConnected}
+                />
             </div>
 
             {/* Game Summary */}
