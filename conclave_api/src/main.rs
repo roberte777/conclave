@@ -76,6 +76,15 @@ async fn main() -> anyhow::Result<()> {
         .route(
             "/games/{game_id}/life-changes",
             get(handlers::get_recent_life_changes),
+        )
+        // Commander Damage endpoints
+        .route(
+            "/games/{game_id}/commander-damage",
+            put(handlers::update_commander_damage),
+        )
+        .route(
+            "/games/{game_id}/players/{player_id}/partner",
+            post(handlers::toggle_partner),
         );
 
     // Build the main router with nested API routes

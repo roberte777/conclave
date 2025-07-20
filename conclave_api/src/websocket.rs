@@ -13,7 +13,7 @@ use axum::{
 };
 use futures::{sink::SinkExt, stream::StreamExt};
 use serde::Deserialize;
-use tracing::{error, info};
+use tracing::{debug, error, info};
 use uuid::Uuid;
 
 #[derive(Debug, Deserialize)]
@@ -164,12 +164,11 @@ async fn send_initial_game_state(
     info!(
         "Sending initial game state for game {} with {} players",
         game_id,
-        game_state.players.len()
+        game_state.players.len(),
     );
 
     let message = WebSocketMessage::GameStarted {
-        game_id,
-        players: game_state.players.clone(),
+        game_state: game_state.clone(),
     };
 
     let msg_text = serde_json::to_string(&message).map_err(|e| ApiError::Internal(e.into()))?;
@@ -179,7 +178,11 @@ async fn send_initial_game_state(
         .await
         .map_err(|e| ApiError::WebSocket(e.to_string()))?;
 
-    info!("Initial game state sent successfully for game {}", game_id);
+    info!(
+        "Complete initial game state sent successfully for game {}",
+        game_id
+    );
+
     Ok(())
 }
 
@@ -200,6 +203,42 @@ async fn handle_websocket_message(text: &str, game_id: Uuid, state: &AppState) -
         }
         WebSocketRequest::GetGameState => handle_get_game_state(game_id, state).await,
         WebSocketRequest::EndGame => handle_end_game(game_id, state).await,
+        WebSocketRequest::SetCommanderDamage {
+            from_player_id,
+            to_player_id,
+            commander_number,
+            new_damage,
+        } => {
+            handle_set_commander_damage(
+                from_player_id,
+                to_player_id,
+                commander_number,
+                new_damage,
+                game_id,
+                state,
+            )
+            .await
+        }
+        WebSocketRequest::UpdateCommanderDamage {
+            from_player_id,
+            to_player_id,
+            commander_number,
+            damage_amount,
+        } => {
+            handle_update_commander_damage(
+                from_player_id,
+                to_player_id,
+                commander_number,
+                damage_amount,
+                game_id,
+                state,
+            )
+            .await
+        }
+        WebSocketRequest::TogglePartner {
+            player_id,
+            enable_partner,
+        } => handle_toggle_partner(player_id, enable_partner, game_id, state).await,
     }
 }
 
@@ -294,10 +333,7 @@ async fn handle_leave_game(player_id: Uuid, game_id: Uuid, state: &AppState) -> 
 async fn handle_get_game_state(game_id: Uuid, state: &AppState) -> Result<()> {
     let game_state = database::get_game_state(&state.db, game_id).await?;
 
-    let message = WebSocketMessage::GameStarted {
-        game_id,
-        players: game_state.players,
-    };
+    let message = WebSocketMessage::GameStarted { game_state };
 
     state.broadcast_to_game(game_id, message);
 
@@ -326,6 +362,199 @@ async fn handle_end_game(game_id: Uuid, state: &AppState) -> Result<()> {
     });
 
     info!("Game {} ended via WebSocket request", game_id);
+    Ok(())
+}
+
+// Commander Damage handlers
+async fn handle_set_commander_damage(
+    from_player_id: Uuid,
+    to_player_id: Uuid,
+    commander_number: i32,
+    new_damage: i32,
+    game_id: Uuid,
+    state: &AppState,
+) -> Result<()> {
+    debug!(
+        "Processing set commander damage for game {}, from {} to {} (commander {}), new damage: {}",
+        game_id, from_player_id, to_player_id, commander_number, new_damage
+    );
+
+    // Verify game is active
+    let game = database::get_game_by_id(&state.db, game_id).await?;
+    if game.status != "active" {
+        return Err(ApiError::GameNotActive);
+    }
+
+    // Update commander damage
+    let updated_damage = database::update_commander_damage(
+        &state.db,
+        game_id,
+        from_player_id,
+        to_player_id,
+        commander_number,
+        new_damage,
+    )
+    .await?;
+
+    info!("Commander damage updated: {} damage", updated_damage.damage);
+
+    // Calculate damage amount for broadcast (difference from previous)
+    let previous_damage = database::get_commander_damage_for_game(&state.db, game_id)
+        .await?
+        .into_iter()
+        .find(|cd| {
+            cd.from_player_id == from_player_id
+                && cd.to_player_id == to_player_id
+                && cd.commander_number == commander_number
+        })
+        .map(|cd| cd.damage)
+        .unwrap_or(0);
+
+    let damage_amount = new_damage - previous_damage;
+
+    // Broadcast the update
+    let message = WebSocketMessage::CommanderDamageUpdate {
+        game_id,
+        from_player_id,
+        to_player_id,
+        commander_number,
+        new_damage,
+        damage_amount,
+    };
+
+    info!(
+        "Broadcasting commander damage update to all clients in game {}: {:?}",
+        game_id, message
+    );
+
+    state.broadcast_to_game(game_id, message);
+
+    debug!(
+        "Commander damage update broadcast completed for game {}",
+        game_id
+    );
+    Ok(())
+}
+
+async fn handle_update_commander_damage(
+    from_player_id: Uuid,
+    to_player_id: Uuid,
+    commander_number: i32,
+    damage_amount: i32,
+    game_id: Uuid,
+    state: &AppState,
+) -> Result<()> {
+    debug!(
+        "Processing update commander damage for game {}, from {} to {} (commander {}), damage amount: {}",
+        game_id, from_player_id, to_player_id, commander_number, damage_amount
+    );
+
+    // Verify game is active
+    let game = database::get_game_by_id(&state.db, game_id).await?;
+    if game.status != "active" {
+        return Err(ApiError::GameNotActive);
+    }
+
+    // Get current damage to calculate new damage
+    let current_damage = database::get_commander_damage_for_game(&state.db, game_id)
+        .await?
+        .into_iter()
+        .find(|cd| {
+            cd.from_player_id == from_player_id
+                && cd.to_player_id == to_player_id
+                && cd.commander_number == commander_number
+        })
+        .map(|cd| cd.damage)
+        .unwrap_or(0);
+
+    let new_damage = current_damage + damage_amount;
+
+    // Update commander damage
+    let _updated_damage = database::update_commander_damage(
+        &state.db,
+        game_id,
+        from_player_id,
+        to_player_id,
+        commander_number,
+        new_damage,
+    )
+    .await?;
+
+    info!(
+        "Commander damage updated: {} -> {} (change: {})",
+        current_damage, new_damage, damage_amount
+    );
+
+    // Broadcast the update
+    let message = WebSocketMessage::CommanderDamageUpdate {
+        game_id,
+        from_player_id,
+        to_player_id,
+        commander_number,
+        new_damage,
+        damage_amount,
+    };
+
+    info!(
+        "Broadcasting commander damage update to all clients in game {}: {:?}",
+        game_id, message
+    );
+
+    state.broadcast_to_game(game_id, message);
+
+    debug!(
+        "Commander damage update broadcast completed for game {}",
+        game_id
+    );
+    Ok(())
+}
+
+async fn handle_toggle_partner(
+    player_id: Uuid,
+    enable_partner: bool,
+    game_id: Uuid,
+    state: &AppState,
+) -> Result<()> {
+    debug!(
+        "Processing toggle partner for game {}, player {}, enable: {}",
+        game_id, player_id, enable_partner
+    );
+
+    // Verify game is active
+    let game = database::get_game_by_id(&state.db, game_id).await?;
+    if game.status != "active" {
+        return Err(ApiError::GameNotActive);
+    }
+
+    // Toggle partner status
+    database::toggle_partner(&state.db, game_id, player_id, enable_partner).await?;
+
+    info!(
+        "Partner {} for player {} in game {}",
+        if enable_partner {
+            "enabled"
+        } else {
+            "disabled"
+        },
+        player_id,
+        game_id
+    );
+
+    // Broadcast the update
+    let message = WebSocketMessage::PartnerToggled {
+        game_id,
+        player_id,
+        has_partner: enable_partner,
+    };
+
+    info!(
+        "Broadcasting partner toggle to all clients in game {}: {:?}",
+        game_id, message
+    );
+
+    state.broadcast_to_game(game_id, message);
+
+    debug!("Partner toggle broadcast completed for game {}", game_id);
     Ok(())
 }
 

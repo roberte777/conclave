@@ -36,6 +36,19 @@ pub struct LifeChange {
     pub created_at: DateTime<Utc>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct CommanderDamage {
+    pub id: Uuid,
+    pub game_id: Uuid,
+    pub from_player_id: Uuid,
+    pub to_player_id: Uuid,
+    pub commander_number: i32, // 1 or 2
+    pub damage: i32,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
 // Request/Response DTOs
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -58,6 +71,22 @@ pub struct UpdateLifeRequest {
     pub change_amount: i32,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateCommanderDamageRequest {
+    pub from_player_id: Uuid,
+    pub to_player_id: Uuid,
+    pub commander_number: i32,
+    pub damage_amount: i32, // Amount to add (can be negative)
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TogglePartnerRequest {
+    pub player_id: Uuid,
+    pub enable_partner: bool,
+}
+
 // Helper struct for representing user info from Clerk
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -65,12 +94,13 @@ pub struct UserInfo {
     pub clerk_user_id: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct GameState {
     pub game: Game,
     pub players: Vec<Player>,
     pub recent_changes: Vec<LifeChange>,
+    pub commander_damage: Vec<CommanderDamage>,
 }
 
 #[derive(Debug, Serialize)]
@@ -123,14 +153,26 @@ pub enum WebSocketMessage {
         game_id: Uuid,
         player_id: Uuid,
     },
-
     GameStarted {
-        game_id: Uuid,
-        players: Vec<Player>,
+        #[serde(flatten)]
+        game_state: GameState,
     },
     GameEnded {
         game_id: Uuid,
         winner: Option<Player>,
+    },
+    CommanderDamageUpdate {
+        game_id: Uuid,
+        from_player_id: Uuid,
+        to_player_id: Uuid,
+        commander_number: i32,
+        new_damage: i32,
+        damage_amount: i32,
+    },
+    PartnerToggled {
+        game_id: Uuid,
+        player_id: Uuid,
+        has_partner: bool,
     },
     Error {
         message: String,
@@ -144,11 +186,34 @@ pub enum WebSocketMessage {
     rename_all_fields = "camelCase"
 )]
 pub enum WebSocketRequest {
-    UpdateLife { player_id: Uuid, change_amount: i32 },
-    JoinGame { clerk_user_id: String },
-    LeaveGame { player_id: Uuid },
+    UpdateLife {
+        player_id: Uuid,
+        change_amount: i32,
+    },
+    JoinGame {
+        clerk_user_id: String,
+    },
+    LeaveGame {
+        player_id: Uuid,
+    },
     GetGameState,
     EndGame,
+    SetCommanderDamage {
+        from_player_id: Uuid,
+        to_player_id: Uuid,
+        commander_number: i32,
+        new_damage: i32,
+    },
+    UpdateCommanderDamage {
+        from_player_id: Uuid,
+        to_player_id: Uuid,
+        commander_number: i32,
+        damage_amount: i32,
+    },
+    TogglePartner {
+        player_id: Uuid,
+        enable_partner: bool,
+    },
 }
 
 // Constants
