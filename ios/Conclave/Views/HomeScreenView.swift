@@ -32,6 +32,10 @@ struct HomeScreenView: View {
             }
 
             VStack {
+                Text("Login")
+                    .font(.title)
+                    .foregroundStyle(.primary)
+                    .padding(10)
                 Text("Offline Game")
                     .font(.title)
                     .foregroundStyle(.primary)
