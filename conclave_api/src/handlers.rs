@@ -234,3 +234,121 @@ pub async fn get_stats(State(state): State<AppState>) -> Result<Json<serde_json:
         "service": "conclave-api"
     })))
 }
+
+// Commander Damage endpoints
+pub async fn update_commander_damage(
+    State(state): State<AppState>,
+    Path(game_id): Path<Uuid>,
+    Json(request): Json<UpdateCommanderDamageRequest>,
+) -> Result<Json<CommanderDamage>> {
+    info!(
+        "Updating commander damage in game {} from player {} to player {} (commander {}) by {}",
+        game_id,
+        request.from_player_id,
+        request.to_player_id,
+        request.commander_number,
+        request.damage_amount
+    );
+
+    // Validate damage amount change
+    if request.damage_amount.abs() > 50 {
+        return Err(ApiError::BadRequest(
+            "Commander damage change too large (max ±50)".to_string(),
+        ));
+    }
+
+    // Verify game is active
+    let game = database::get_game_by_id(&state.db, game_id).await?;
+    if game.status != "active" {
+        return Err(ApiError::GameNotActive);
+    }
+
+    // Get current damage to calculate new damage
+    let current_damage = database::get_commander_damage_for_game(&state.db, game_id)
+        .await?
+        .into_iter()
+        .find(|cd| {
+            cd.from_player_id == request.from_player_id
+                && cd.to_player_id == request.to_player_id
+                && cd.commander_number == request.commander_number
+        })
+        .map(|cd| cd.damage)
+        .unwrap_or(0);
+
+    let new_damage = current_damage + request.damage_amount;
+
+    // Update commander damage
+    let updated_damage = database::update_commander_damage(
+        &state.db,
+        game_id,
+        request.from_player_id,
+        request.to_player_id,
+        request.commander_number,
+        new_damage,
+    )
+    .await?;
+
+    // Broadcast commander damage update via WebSocket
+    let message = WebSocketMessage::CommanderDamageUpdate {
+        game_id,
+        from_player_id: request.from_player_id,
+        to_player_id: request.to_player_id,
+        commander_number: request.commander_number,
+        new_damage,
+        damage_amount: request.damage_amount,
+    };
+    state.broadcast_to_game(game_id, message);
+
+    info!(
+        "Commander damage updated in game {} from player {} to player {} (commander {}): new damage = {}",
+        game_id, request.from_player_id, request.to_player_id, request.commander_number, new_damage
+    );
+    Ok(Json(updated_damage))
+}
+
+pub async fn toggle_partner(
+    State(state): State<AppState>,
+    Path((game_id, player_id)): Path<(Uuid, Uuid)>,
+    Json(request): Json<TogglePartnerRequest>,
+) -> Result<StatusCode> {
+    info!(
+        "Toggling partner for player {} in game {} to {}",
+        player_id, game_id, request.enable_partner
+    );
+
+    // Verify game is active
+    let game = database::get_game_by_id(&state.db, game_id).await?;
+    if game.status != "active" {
+        return Err(ApiError::GameNotActive);
+    }
+
+    // Verify the player_id in path matches the one in request
+    if player_id != request.player_id {
+        return Err(ApiError::BadRequest(
+            "Player ID in path does not match request".to_string(),
+        ));
+    }
+
+    // Toggle partner status
+    database::toggle_partner(&state.db, game_id, player_id, request.enable_partner).await?;
+
+    // Broadcast partner toggle event via WebSocket
+    let message = WebSocketMessage::PartnerToggled {
+        game_id,
+        player_id,
+        has_partner: request.enable_partner,
+    };
+    state.broadcast_to_game(game_id, message);
+
+    info!(
+        "Partner {} for player {} in game {}",
+        if request.enable_partner {
+            "enabled"
+        } else {
+            "disabled"
+        },
+        player_id,
+        game_id
+    );
+    Ok(StatusCode::OK)
+}
