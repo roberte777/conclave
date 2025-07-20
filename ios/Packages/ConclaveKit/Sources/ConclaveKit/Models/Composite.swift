@@ -4,11 +4,13 @@ public struct GameState: Codable, Equatable, Sendable {
     public let game: Game
     public let players: [Player]
     public let recentChanges: [LifeChange]
+    public let commanderDamage: [CommanderDamage]
 
-    public init(game: Game, players: [Player], recentChanges: [LifeChange]) {
+    public init(game: Game, players: [Player], recentChanges: [LifeChange], commanderDamage: [CommanderDamage] = []) {
         self.game = game
         self.players = players
         self.recentChanges = recentChanges
+        self.commanderDamage = commanderDamage
     }
 }
 
