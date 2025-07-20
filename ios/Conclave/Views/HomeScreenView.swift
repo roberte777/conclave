@@ -32,6 +32,13 @@ struct HomeScreenView: View {
             }
 
             VStack {
+                Text("Login")
+                    .font(.title)
+                    .foregroundStyle(.primary)
+                    .onTapGesture {
+                        screenPath.append(Screen.login)
+                    }
+                    .padding(10)
                 Text("Offline Game")
                     .font(.title)
                     .foregroundStyle(.primary)

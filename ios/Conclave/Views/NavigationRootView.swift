@@ -14,6 +14,8 @@ struct NavigationRootView: View {
                             .navigationBarBackButtonHidden()
                     case .userSettings:
                         UserSettingsView()
+                    case .login:
+                        EmptyView()
                     }
                 }
         }
