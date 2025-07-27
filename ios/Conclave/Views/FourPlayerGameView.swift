@@ -7,12 +7,12 @@ struct FourPlayerGameView: View {
         ZStack {
             VStack {
                 HStack {
-                    UserHealthView(.blue, isFlipped: true)
-                    UserHealthView(.red, isFlipped: true)
+                    UserHealthView(.blue, lifeOrientation: .Left)
+                    UserHealthView(.red, lifeOrientation: .Right)
                 }
                 HStack {
-                    UserHealthView(.green, isFlipped: true)
-                    UserHealthView(.yellow, isFlipped: true)
+                    UserHealthView(.green, lifeOrientation: .Left)
+                    UserHealthView(.yellow, lifeOrientation: .Right)
                 }
             }
             .padding()
