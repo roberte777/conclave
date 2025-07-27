@@ -145,6 +145,9 @@ async fn join_game_in_tx(
     .execute(&mut **tx)
     .await?;
 
+    // Initialize commander damage entries for this player
+    initialize_commander_damage_for_player_in_tx(tx, game_id, player.id).await?;
+
     Ok(player)
 }
 
@@ -166,18 +169,34 @@ pub async fn leave_game(pool: &SqlitePool, game_id: Uuid, clerk_user_id: &str) -
         ));
     }
 
-    // Find and remove player, getting their position
-    let player_result = sqlx::query(
-        "DELETE FROM players WHERE game_id = ? AND clerk_user_id = ? RETURNING position",
+    // Find player and get their ID for commander damage cleanup
+    let player_result =
+        sqlx::query("SELECT id, position FROM players WHERE game_id = ? AND clerk_user_id = ?")
+            .bind(game_id.to_string())
+            .bind(clerk_user_id)
+            .fetch_optional(&mut *tx)
+            .await?;
+
+    let player_row = player_result.ok_or(ApiError::PlayerNotFound)?;
+    let player_id = Uuid::parse_str(&player_row.get::<String, _>("id")).unwrap();
+    let removed_position: i32 = player_row.get("position");
+
+    // Clean up commander damage entries involving this player
+    sqlx::query(
+        "DELETE FROM commander_damage WHERE game_id = ? AND (from_player_id = ? OR to_player_id = ?)"
     )
     .bind(game_id.to_string())
-    .bind(clerk_user_id)
-    .fetch_optional(&mut *tx)
+    .bind(player_id.to_string())
+    .bind(player_id.to_string())
+    .execute(&mut *tx)
     .await?;
 
-    let removed_position: i32 = player_result
-        .ok_or(ApiError::PlayerNotFound)?
-        .get("position");
+    // Remove the player
+    sqlx::query("DELETE FROM players WHERE game_id = ? AND clerk_user_id = ?")
+        .bind(game_id.to_string())
+        .bind(clerk_user_id)
+        .execute(&mut *tx)
+        .await?;
 
     // Shift positions down for players that were after the removed player
     sqlx::query("UPDATE players SET position = position - 1 WHERE game_id = ? AND position > ?")
@@ -246,11 +265,13 @@ pub async fn get_game_state(pool: &SqlitePool, game_id: Uuid) -> Result<GameStat
     let game = get_game_by_id(pool, game_id).await?;
     let players = get_players_in_game(pool, game_id).await?;
     let recent_changes = get_recent_life_changes(pool, game_id, 20).await?;
+    let commander_damage = get_commander_damage_for_game(pool, game_id).await?;
 
     Ok(GameState {
         game,
         players,
         recent_changes,
+        commander_damage,
     })
 }
 
@@ -469,6 +490,277 @@ pub async fn get_user_game_history(pool: &SqlitePool, clerk_user_id: &str) -> Re
     }
 
     Ok(GameHistory { games })
+}
+
+// Commander Damage operations
+async fn initialize_commander_damage_for_player_in_tx(
+    tx: &mut Transaction<'_, Sqlite>,
+    game_id: Uuid,
+    player_id: Uuid,
+) -> Result<()> {
+    // Get all existing players in the game
+    let existing_players = sqlx::query("SELECT id FROM players WHERE game_id = ? AND id != ?")
+        .bind(game_id.to_string())
+        .bind(player_id.to_string())
+        .fetch_all(&mut **tx)
+        .await?;
+
+    let now = Utc::now().to_rfc3339();
+
+    // Create commander damage entries for new player TO all existing players (Commander 1 only)
+    for existing_player_row in &existing_players {
+        let existing_player_id =
+            Uuid::parse_str(&existing_player_row.get::<String, _>("id")).unwrap();
+
+        // From new player to existing player
+        sqlx::query(
+            "INSERT INTO commander_damage (id, game_id, from_player_id, to_player_id, commander_number, damage, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+        )
+        .bind(Uuid::new_v4().to_string())
+        .bind(game_id.to_string())
+        .bind(player_id.to_string())
+        .bind(existing_player_id.to_string())
+        .bind(1) // Commander 1
+        .bind(0) // Initial damage
+        .bind(&now)
+        .bind(&now)
+        .execute(&mut **tx)
+        .await?;
+
+        // From existing player to new player
+        sqlx::query(
+            "INSERT INTO commander_damage (id, game_id, from_player_id, to_player_id, commander_number, damage, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+        )
+        .bind(Uuid::new_v4().to_string())
+        .bind(game_id.to_string())
+        .bind(existing_player_id.to_string())
+        .bind(player_id.to_string())
+        .bind(1) // Commander 1
+        .bind(0) // Initial damage
+        .bind(&now)
+        .bind(&now)
+        .execute(&mut **tx)
+        .await?;
+    }
+
+    Ok(())
+}
+
+pub async fn update_commander_damage(
+    pool: &SqlitePool,
+    game_id: Uuid,
+    from_player_id: Uuid,
+    to_player_id: Uuid,
+    commander_number: i32,
+    new_damage: i32,
+) -> Result<CommanderDamage> {
+    let mut tx = pool.begin().await?;
+
+    // Validate damage amount
+    if new_damage < 0 {
+        return Err(ApiError::BadRequest(
+            "Commander damage cannot be negative".to_string(),
+        ));
+    }
+    if new_damage > 999 {
+        return Err(ApiError::BadRequest(
+            "Commander damage cannot exceed 999".to_string(),
+        ));
+    }
+
+    // Validate commander number
+    if commander_number != 1 && commander_number != 2 {
+        return Err(ApiError::BadRequest(
+            "Commander number must be 1 or 2".to_string(),
+        ));
+    }
+
+    // Validate players exist and are in the game
+    let from_player_exists =
+        sqlx::query("SELECT COUNT(*) as count FROM players WHERE id = ? AND game_id = ?")
+            .bind(from_player_id.to_string())
+            .bind(game_id.to_string())
+            .fetch_one(&mut *tx)
+            .await?
+            .get::<i64, _>("count")
+            > 0;
+
+    let to_player_exists =
+        sqlx::query("SELECT COUNT(*) as count FROM players WHERE id = ? AND game_id = ?")
+            .bind(to_player_id.to_string())
+            .bind(game_id.to_string())
+            .fetch_one(&mut *tx)
+            .await?
+            .get::<i64, _>("count")
+            > 0;
+
+    if !from_player_exists || !to_player_exists {
+        return Err(ApiError::BadRequest(
+            "One or both players not found in game".to_string(),
+        ));
+    }
+
+    // Prevent self-damage
+    if from_player_id == to_player_id {
+        return Err(ApiError::BadRequest(
+            "Players cannot deal commander damage to themselves".to_string(),
+        ));
+    }
+
+    let now = Utc::now().to_rfc3339();
+
+    // Update or insert commander damage entry
+    let result = sqlx::query(
+        r#"
+        INSERT INTO commander_damage (id, game_id, from_player_id, to_player_id, commander_number, damage, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(game_id, from_player_id, to_player_id, commander_number) 
+        DO UPDATE SET damage = ?, updated_at = ?
+        RETURNING *
+        "#
+    )
+    .bind(Uuid::new_v4().to_string())
+    .bind(game_id.to_string())
+    .bind(from_player_id.to_string())
+    .bind(to_player_id.to_string())
+    .bind(commander_number)
+    .bind(new_damage)
+    .bind(&now)
+    .bind(&now)
+    .bind(new_damage)
+    .bind(&now)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    let commander_damage = CommanderDamage {
+        id: Uuid::parse_str(&result.get::<String, _>("id")).unwrap(),
+        game_id: Uuid::parse_str(&result.get::<String, _>("game_id")).unwrap(),
+        from_player_id: Uuid::parse_str(&result.get::<String, _>("from_player_id")).unwrap(),
+        to_player_id: Uuid::parse_str(&result.get::<String, _>("to_player_id")).unwrap(),
+        commander_number: result.get("commander_number"),
+        damage: result.get("damage"),
+        created_at: chrono::DateTime::parse_from_rfc3339(&result.get::<String, _>("created_at"))
+            .unwrap()
+            .with_timezone(&Utc),
+        updated_at: chrono::DateTime::parse_from_rfc3339(&result.get::<String, _>("updated_at"))
+            .unwrap()
+            .with_timezone(&Utc),
+    };
+
+    tx.commit().await?;
+    Ok(commander_damage)
+}
+
+pub async fn get_commander_damage_for_game(
+    pool: &SqlitePool,
+    game_id: Uuid,
+) -> Result<Vec<CommanderDamage>> {
+    let rows = sqlx::query("SELECT * FROM commander_damage WHERE game_id = ? ORDER BY from_player_id, to_player_id, commander_number")
+        .bind(game_id.to_string())
+        .fetch_all(pool)
+        .await?;
+
+    let commander_damages = rows
+        .into_iter()
+        .map(|row| CommanderDamage {
+            id: Uuid::parse_str(&row.get::<String, _>("id")).unwrap(),
+            game_id: Uuid::parse_str(&row.get::<String, _>("game_id")).unwrap(),
+            from_player_id: Uuid::parse_str(&row.get::<String, _>("from_player_id")).unwrap(),
+            to_player_id: Uuid::parse_str(&row.get::<String, _>("to_player_id")).unwrap(),
+            commander_number: row.get("commander_number"),
+            damage: row.get("damage"),
+            created_at: chrono::DateTime::parse_from_rfc3339(&row.get::<String, _>("created_at"))
+                .unwrap()
+                .with_timezone(&Utc),
+            updated_at: chrono::DateTime::parse_from_rfc3339(&row.get::<String, _>("updated_at"))
+                .unwrap()
+                .with_timezone(&Utc),
+        })
+        .collect();
+
+    Ok(commander_damages)
+}
+
+pub async fn toggle_partner(
+    pool: &SqlitePool,
+    game_id: Uuid,
+    player_id: Uuid,
+    enable_partner: bool,
+) -> Result<()> {
+    let mut tx = pool.begin().await?;
+
+    // Validate player exists in game
+    let player_exists =
+        sqlx::query("SELECT COUNT(*) as count FROM players WHERE id = ? AND game_id = ?")
+            .bind(player_id.to_string())
+            .bind(game_id.to_string())
+            .fetch_one(&mut *tx)
+            .await?
+            .get::<i64, _>("count")
+            > 0;
+
+    if !player_exists {
+        return Err(ApiError::BadRequest("Player not found in game".to_string()));
+    }
+
+    if enable_partner {
+        // Create Commander 2 entries for this player with all other players
+        let other_players = sqlx::query("SELECT id FROM players WHERE game_id = ? AND id != ?")
+            .bind(game_id.to_string())
+            .bind(player_id.to_string())
+            .fetch_all(&mut *tx)
+            .await?;
+
+        let now = Utc::now().to_rfc3339();
+
+        for other_player_row in other_players {
+            let other_player_id =
+                Uuid::parse_str(&other_player_row.get::<String, _>("id")).unwrap();
+
+            // From this player to other player (Commander 2)
+            sqlx::query(
+                "INSERT OR IGNORE INTO commander_damage (id, game_id, from_player_id, to_player_id, commander_number, damage, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+            )
+            .bind(Uuid::new_v4().to_string())
+            .bind(game_id.to_string())
+            .bind(player_id.to_string())
+            .bind(other_player_id.to_string())
+            .bind(2) // Commander 2
+            .bind(0) // Initial damage
+            .bind(&now)
+            .bind(&now)
+            .execute(&mut *tx)
+            .await?;
+
+            // From other player to this player (Commander 2)
+            sqlx::query(
+                "INSERT OR IGNORE INTO commander_damage (id, game_id, from_player_id, to_player_id, commander_number, damage, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+            )
+            .bind(Uuid::new_v4().to_string())
+            .bind(game_id.to_string())
+            .bind(other_player_id.to_string())
+            .bind(player_id.to_string())
+            .bind(2) // Commander 2
+            .bind(0) // Initial damage
+            .bind(&now)
+            .bind(&now)
+            .execute(&mut *tx)
+            .await?;
+        }
+    } else {
+        // Remove all Commander 2 entries involving this player
+        sqlx::query(
+            "DELETE FROM commander_damage WHERE game_id = ? AND commander_number = 2 AND (from_player_id = ? OR to_player_id = ?)"
+        )
+        .bind(game_id.to_string())
+        .bind(player_id.to_string())
+        .bind(player_id.to_string())
+        .execute(&mut *tx)
+        .await?;
+    }
+
+    tx.commit().await?;
+    Ok(())
 }
 
 pub async fn get_available_games(
