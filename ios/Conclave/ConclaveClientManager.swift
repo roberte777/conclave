@@ -317,6 +317,12 @@ public class ConclaveClientManager {
         case .gameEnded(let gameEndedMessage):
             handleGameEnded(gameEndedMessage)
 
+        case .commanderDamageUpdate(let commanderDamageMessage):
+            handleCommanderDamageUpdate(commanderDamageMessage)
+
+        case .partnerToggled(let partnerMessage):
+            handlePartnerToggled(partnerMessage)
+
         case .error(let errorMessage):
             handleWebSocketError(errorMessage)
         }
@@ -427,6 +433,26 @@ public class ConclaveClientManager {
     @MainActor
     private func handleWebSocketError(_ message: ErrorMessage) {
         lastError = ConclaveError.webSocketError(message.message)
+    }
+
+    @MainActor
+    private func handleCommanderDamageUpdate(_ message: CommanderDamageUpdateMessage) {
+        // Log commander damage update for now
+        // In a full implementation, this would update commander damage state
+        ConclaveLogger.shared.logStateChange(
+            "Commander damage updated",
+            details: "From player \(message.fromPlayerId) to \(message.toPlayerId) | Commander \(message.commanderNumber) | Damage: \(message.newDamage)"
+        )
+    }
+
+    @MainActor
+    private func handlePartnerToggled(_ message: PartnerToggledMessage) {
+        // Log partner toggle for now
+        // In a full implementation, this would update player partner status
+        ConclaveLogger.shared.logStateChange(
+            "Partner toggled",
+            details: "Player \(message.playerId) | Has partner: \(message.hasPartner)"
+        )
     }
 
     // MARK: - WebSocket Actions
