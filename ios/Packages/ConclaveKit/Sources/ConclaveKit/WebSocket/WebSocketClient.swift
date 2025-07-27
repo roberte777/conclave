@@ -411,6 +411,47 @@ public final class WebSocketClient: ConclaveWebSocketClient, Sendable {
         try await sendMessage(message)
     }
 
+    // MARK: - Commander Damage WebSocket Methods
+
+    public func setCommanderDamage(
+        fromPlayerId: UUID,
+        toPlayerId: UUID,
+        commanderNumber: Int32,
+        newDamage: Int32
+    ) async throws {
+        let message = ClientMessage.setCommanderDamage(
+            fromPlayerId: fromPlayerId,
+            toPlayerId: toPlayerId,
+            commanderNumber: commanderNumber,
+            newDamage: newDamage
+        )
+        try await sendMessage(message)
+    }
+
+    public func updateCommanderDamage(
+        fromPlayerId: UUID,
+        toPlayerId: UUID,
+        commanderNumber: Int32,
+        damageAmount: Int32
+    ) async throws {
+        let message = ClientMessage.updateCommanderDamage(
+            fromPlayerId: fromPlayerId,
+            toPlayerId: toPlayerId,
+            commanderNumber: commanderNumber,
+            damageAmount: damageAmount
+        )
+        try await sendMessage(message)
+    }
+
+    public func togglePartner(playerId: UUID, enablePartner: Bool) async throws
+    {
+        let message = ClientMessage.togglePartner(
+            playerId: playerId,
+            enablePartner: enablePartner
+        )
+        try await sendMessage(message)
+    }
+
     // MARK: - Private Methods
 
     private func startListening() async {

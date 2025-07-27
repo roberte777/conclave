@@ -46,10 +46,22 @@ export interface LifeChange {
     createdAt: string;
 }
 
+export interface CommanderDamage {
+    id: string;
+    gameId: string;
+    fromPlayerId: string;
+    toPlayerId: string;
+    commanderNumber: 1 | 2;
+    damage: number;
+    createdAt: string;
+    updatedAt: string;
+}
+
 export interface GameState {
     game: Game;
     players: Player[];
     recentChanges: LifeChange[];
+    commanderDamage: CommanderDamage[];
 }
 
 export interface GameWithPlayers {
@@ -76,6 +88,18 @@ export interface JoinGameRequest {
 export interface UpdateLifeRequest {
     playerId: string;
     changeAmount: number;
+}
+
+export interface UpdateCommanderDamageRequest {
+    fromPlayerId: string;
+    toPlayerId: string;
+    commanderNumber: 1 | 2;
+    damageAmount: number;
+}
+
+export interface TogglePartnerRequest {
+    playerId: string;
+    enablePartner: boolean;
 }
 
 // API functions
@@ -118,6 +142,16 @@ export const gameApi = {
         const response = await api.get(`/games/${gameId}/life-changes`);
         return response.data;
     },
+
+    // Commander Damage methods
+    updateCommanderDamage: async (gameId: string, data: UpdateCommanderDamageRequest): Promise<CommanderDamage> => {
+        const response = await api.put(`/games/${gameId}/commander-damage`, data);
+        return response.data;
+    },
+
+    togglePartner: async (gameId: string, playerId: string, data: TogglePartnerRequest): Promise<void> => {
+        await api.post(`/games/${gameId}/players/${playerId}/partner`, data);
+    },
 };
 
 export const userApi = {
@@ -148,6 +182,24 @@ export const healthApi = {
         return response.data;
     },
 };
+
+// WebSocket Message Types
+export type WebSocketMessage = 
+    | { type: 'lifeUpdate'; gameId?: string; playerId?: string; newLife?: number; changeAmount?: number; }
+    | { type: 'playerJoined'; gameId?: string; player?: Player; }
+    | { type: 'playerLeft'; gameId?: string; playerId?: string; }
+    | { type: 'gameStarted'; gameId?: string; players?: Player[]; commanderDamage?: CommanderDamage[]; }
+    | { type: 'gameEnded'; gameId?: string; winner?: Player; }
+    | { type: 'commanderDamageUpdate'; gameId: string; fromPlayerId: string; toPlayerId: string; commanderNumber: 1 | 2; newDamage: number; damageAmount: number; }
+    | { type: 'partnerToggled'; gameId: string; playerId: string; hasPartner: boolean; }
+    | { type: 'error'; message?: string; };
+
+export type WebSocketRequest =
+    | { action: 'updateLife'; playerId: string; changeAmount: number; }
+    | { action: 'endGame'; }
+    | { action: 'setCommanderDamage'; fromPlayerId: string; toPlayerId: string; commanderNumber: 1 | 2; newDamage: number; }
+    | { action: 'updateCommanderDamage'; fromPlayerId: string; toPlayerId: string; commanderNumber: 1 | 2; damageAmount: number; }
+    | { action: 'togglePartner'; playerId: string; enablePartner: boolean; };
 
 // WebSocket utilities
 export const createWebSocketUrl = (gameId: string, clerkUserId: string): string => {
