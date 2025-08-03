@@ -183,89 +183,31 @@ struct UserHealthView: View {
 }
 
 #Preview {
-    //    @Previewable @State var mockManager: ConclaveClientManager = {
-    //        let manager = ConclaveClientManager(client: MockConclaveClient.testing)
-    //
-    //        return manager
-    //    }()
-    //    VStack {
-    //        HStack {
-    //            UserHealthView(
-    //                $mockManager.allPlayers[0],
-    //                .red,
-    //                lifeOrientation: .Up
-    //            )
-    //            .environment(mockManager)
-    //        }
-    //        HStack {
-    //            UserHealthView(
-    //                $mockManager.allPlayers[1],
-    //                .yellow,
-    //                lifeOrientation: .Left
-    //            )
-    //            .environment(mockManager)
-    //            UserHealthView(
-    //                $mockManager.allPlayers[2],
-    //                .blue,
-    //                lifeOrientation: .Right
-    //            )
-    //            .environment(mockManager)
-    //        }
-    //    }
-    //    .task({
-    //        do {
-    //            let gameId = UUID()
-    //
-    //            // Setup mock game state for preview
-    //            let mockGame = Game(
-    //                id: gameId,
-    //                name: "Preview Game",
-    //                status: .active,
-    //                startingLife: 40,
-    //                createdAt: Date(),
-    //                finishedAt: nil
-    //            )
-    //
-    //            let mockPlayer1 = Player(
-    //                id: UUID(),
-    //                gameId: gameId,
-    //                clerkUserId: "preview_user1",
-    //                currentLife: 40,
-    //                position: 1,
-    //                isEliminated: false
-    //            )
-    //            let mockPlayer2 = Player(
-    //                id: UUID(),
-    //                gameId: gameId,
-    //                clerkUserId: "preview_user2",
-    //                currentLife: 40,
-    //                position: 1,
-    //                isEliminated: false
-    //            )
-    //            let mockPlayer3 = Player(
-    //                id: UUID(),
-    //                gameId: gameId,
-    //                clerkUserId: "preview_user3",
-    //                currentLife: 40,
-    //                position: 1,
-    //                isEliminated: false
-    //            )
-    //
-    //            mockManager.currentGame = mockGame
-    //            mockManager.currentPlayer = mockPlayer1
-    //            mockManager.allPlayers = [
-    //                mockPlayer1,
-    //                mockPlayer2,
-    //                mockPlayer3,
-    //            ]
-    //
-    //            try await mockManager.connectToWebSocket(
-    //                gameId: mockManager.currentPlayer?.gameId ?? UUID(),
-    //                clerkUserId: mockManager.currentPlayer?.clerkUserId ?? ""
-    //            )
-    //        } catch {
-    //            print("\(error)")
-    //        }
-    //    })
-    //    .padding()
+    @Previewable @State var mockManager: ConclaveClientManager =
+        ConclaveClientManager(client: MockConclaveClient.testing)
+    if mockManager.isConnectedToWebSocket {
+        HStack {
+            UserHealthView(
+                $mockManager.allPlayers[0],
+                .red,
+                lifeOrientation: .Up
+            )
+            .environment(mockManager)
+        }
+
+        Text("Connected!")
+    } else {
+        Text("Not Connected!").task {
+            do {
+                let game = try await mockManager.createGame(
+                    name: "MyGame",
+                    clerkUserId: "MyUser"
+                )
+                try await mockManager
+                    .connectToWebSocket(gameId: game.id, clerkUserId: "MyUser")
+            } catch {
+                print("Failed to create game: \(error)")
+            }
+        }
+    }
 }
