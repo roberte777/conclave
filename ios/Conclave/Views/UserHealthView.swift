@@ -146,7 +146,6 @@ struct UserHealthView: View {
     var body: some View {
         GeometryReader { geo in
             ZStack {
-
                 RoundedRectangle(cornerRadius: 15)
                     .fill(healthColor)
 
@@ -172,6 +171,10 @@ struct UserHealthView: View {
                         )
                         .environment(conclave)
                     }
+                }
+                VStack {
+                    Text("\(player.clerkUserId)")
+                    Spacer()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

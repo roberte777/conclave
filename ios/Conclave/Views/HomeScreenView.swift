@@ -36,7 +36,7 @@ struct HomeScreenView: View {
                     .font(.title)
                     .foregroundStyle(.primary)
                     .onTapGesture {
-                        screenPath.append(Screen.login)
+                        screenPath.append(Screen.gameList)
                     }
                     .padding(10)
                 Text("Offline Game")
