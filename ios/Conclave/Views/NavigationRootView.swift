@@ -15,7 +15,8 @@ struct NavigationRootView: View {
                     case .userSettings:
                         UserSettingsView()
                     case .login:
-                        EmptyView()
+                        GameListView(screenPath: $screenPath)
+                            .environment(conclave)
                     }
                 }
         }

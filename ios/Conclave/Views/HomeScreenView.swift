@@ -32,7 +32,7 @@ struct HomeScreenView: View {
             }
 
             VStack {
-                Text("Login")
+                Text("Online Game")
                     .font(.title)
                     .foregroundStyle(.primary)
                     .onTapGesture {
