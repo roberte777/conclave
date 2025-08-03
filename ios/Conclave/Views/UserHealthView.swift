@@ -34,9 +34,6 @@ struct UserHealthView: View {
         private func changeHealth(_ healthChange: Int32) {
             Task {
                 do {
-                    print(
-                        "Current User Id=\(conclave.currentPlayer?.id)\nLife Update: userId \(player.id)"
-                    )
                     try await conclave.sendLifeUpdate(
                         playerId: player.id,
                         changeAmount: healthChange
@@ -194,20 +191,23 @@ struct UserHealthView: View {
             )
             .environment(mockManager)
         }
-
-        Text("Connected!")
     } else {
-        Text("Not Connected!").task {
-            do {
-                let game = try await mockManager.createGame(
-                    name: "MyGame",
-                    clerkUserId: "MyUser"
-                )
-                try await mockManager
-                    .connectToWebSocket(gameId: game.id, clerkUserId: "MyUser")
-            } catch {
-                print("Failed to create game: \(error)")
+        ProgressView()
+            .progressViewStyle(.circular)
+            .task {
+                do {
+                    let game = try await mockManager.createGame(
+                        name: "MyGame",
+                        clerkUserId: "MyUser"
+                    )
+                    try await mockManager
+                        .connectToWebSocket(
+                            gameId: game.id,
+                            clerkUserId: "MyUser"
+                        )
+                } catch {
+                    print("Failed to create game: \(error)")
+                }
             }
-        }
     }
 }
