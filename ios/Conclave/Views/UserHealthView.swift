@@ -1,3 +1,4 @@
+import ConclaveKit
 import SwiftUI
 
 enum LifeOrientation: Double {
@@ -9,41 +10,59 @@ enum LifeOrientation: Double {
 
 struct UserHealthView: View {
     @State var healthColor: Color
-    @State var healthTotal: Int
     @State var lifeOrientation: LifeOrientation
+    @Binding var player: Player
+    @Environment(ConclaveClientManager.self) private var conclave
 
     init(
+        _ player: Binding<Player>,
         _ healthColor: SwiftUICore.Color,
-        lifeOrientation: LifeOrientation = .Up
+        lifeOrientation: LifeOrientation = .Up,
     ) {
+        _player = player
         self.healthColor = healthColor
-        self.healthTotal = 40
         self.lifeOrientation = lifeOrientation
-
     }
 
     struct HealthButtons: View {
-        @Binding var givenHealthTotal: Int
+        @Binding var player: Player
         @Binding var givenLifeOrientation: LifeOrientation
         @State private var leftHoldTimer: Timer?
         @State private var rightHoldTimer: Timer?
+        @Environment(ConclaveClientManager.self) private var conclave
+
+        private func changeHealth(_ healthChange: Int32) {
+            Task {
+                do {
+                    print(
+                        "Current User Id=\(conclave.currentPlayer?.id)\nLife Update: userId \(player.id)"
+                    )
+                    try await conclave.sendLifeUpdate(
+                        playerId: player.id,
+                        changeAmount: healthChange
+                    )
+                } catch {
+                    print("\(error)")
+                }
+            }
+        }
 
         private func subAddStartTimer(isLeft: Bool) {
             if isLeft {
-                givenHealthTotal -= 10
+                changeHealth(-10)
                 leftHoldTimer = Timer.scheduledTimer(
                     withTimeInterval: 0.5,
                     repeats: true
                 ) { _ in
-                    givenHealthTotal -= 10
+                    changeHealth(-10)
                 }
             } else {
-                givenHealthTotal += 10
+                changeHealth(10)
                 rightHoldTimer = Timer.scheduledTimer(
                     withTimeInterval: 0.5,
                     repeats: true
                 ) { _ in
-                    givenHealthTotal += 10
+                    changeHealth(10)
                 }
             }
         }
@@ -71,9 +90,9 @@ struct UserHealthView: View {
                     .contentShape(Rectangle())
                     .onTapGesture {
                         if flipLeftRight {
-                            givenHealthTotal += 1
+                            changeHealth(1)
                         } else {
-                            givenHealthTotal -= 1
+                            changeHealth(-1)
                         }
                     }
                     .gesture(
@@ -100,9 +119,9 @@ struct UserHealthView: View {
                     .contentShape(Rectangle())
                     .onTapGesture {
                         if flipLeftRight {
-                            givenHealthTotal -= 1
+                            changeHealth(-1)
                         } else {
-                            givenHealthTotal += 1
+                            changeHealth(1)
                         }
                     }
                     .gesture(
@@ -134,7 +153,7 @@ struct UserHealthView: View {
                 RoundedRectangle(cornerRadius: 15)
                     .fill(healthColor)
 
-                Text("\(healthTotal)")
+                Text("\(player.currentLife)")
                     .foregroundStyle(.white)
                     .rotationEffect(Angle(degrees: lifeOrientation.rawValue))
                     .font(.system(size: geo.size.width * 0.3))
@@ -143,16 +162,18 @@ struct UserHealthView: View {
                 if lifeOrientation == .Left || lifeOrientation == .Right {
                     VStack(spacing: 0) {
                         HealthButtons(
-                            givenHealthTotal: $healthTotal,
+                            player: $player,
                             givenLifeOrientation: $lifeOrientation
                         )
+                        .environment(conclave)
                     }
                 } else {
                     HStack(spacing: 0) {
                         HealthButtons(
-                            givenHealthTotal: $healthTotal,
+                            player: $player,
                             givenLifeOrientation: $lifeOrientation
                         )
+                        .environment(conclave)
                     }
                 }
             }
@@ -162,14 +183,89 @@ struct UserHealthView: View {
 }
 
 #Preview {
-    VStack {
-        HStack {
-            UserHealthView(.red, lifeOrientation: .Up)
-        }
-        HStack {
-            UserHealthView(.yellow, lifeOrientation: .Left)
-            UserHealthView(.blue, lifeOrientation: .Right)
-        }
-    }
-    .padding()
+    //    @Previewable @State var mockManager: ConclaveClientManager = {
+    //        let manager = ConclaveClientManager(client: MockConclaveClient.testing)
+    //
+    //        return manager
+    //    }()
+    //    VStack {
+    //        HStack {
+    //            UserHealthView(
+    //                $mockManager.allPlayers[0],
+    //                .red,
+    //                lifeOrientation: .Up
+    //            )
+    //            .environment(mockManager)
+    //        }
+    //        HStack {
+    //            UserHealthView(
+    //                $mockManager.allPlayers[1],
+    //                .yellow,
+    //                lifeOrientation: .Left
+    //            )
+    //            .environment(mockManager)
+    //            UserHealthView(
+    //                $mockManager.allPlayers[2],
+    //                .blue,
+    //                lifeOrientation: .Right
+    //            )
+    //            .environment(mockManager)
+    //        }
+    //    }
+    //    .task({
+    //        do {
+    //            let gameId = UUID()
+    //
+    //            // Setup mock game state for preview
+    //            let mockGame = Game(
+    //                id: gameId,
+    //                name: "Preview Game",
+    //                status: .active,
+    //                startingLife: 40,
+    //                createdAt: Date(),
+    //                finishedAt: nil
+    //            )
+    //
+    //            let mockPlayer1 = Player(
+    //                id: UUID(),
+    //                gameId: gameId,
+    //                clerkUserId: "preview_user1",
+    //                currentLife: 40,
+    //                position: 1,
+    //                isEliminated: false
+    //            )
+    //            let mockPlayer2 = Player(
+    //                id: UUID(),
+    //                gameId: gameId,
+    //                clerkUserId: "preview_user2",
+    //                currentLife: 40,
+    //                position: 1,
+    //                isEliminated: false
+    //            )
+    //            let mockPlayer3 = Player(
+    //                id: UUID(),
+    //                gameId: gameId,
+    //                clerkUserId: "preview_user3",
+    //                currentLife: 40,
+    //                position: 1,
+    //                isEliminated: false
+    //            )
+    //
+    //            mockManager.currentGame = mockGame
+    //            mockManager.currentPlayer = mockPlayer1
+    //            mockManager.allPlayers = [
+    //                mockPlayer1,
+    //                mockPlayer2,
+    //                mockPlayer3,
+    //            ]
+    //
+    //            try await mockManager.connectToWebSocket(
+    //                gameId: mockManager.currentPlayer?.gameId ?? UUID(),
+    //                clerkUserId: mockManager.currentPlayer?.clerkUserId ?? ""
+    //            )
+    //        } catch {
+    //            print("\(error)")
+    //        }
+    //    })
+    //    .padding()
 }
