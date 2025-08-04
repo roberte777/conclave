@@ -20,6 +20,9 @@ pub enum ApiError {
     #[error("Game is not active")]
     GameNotActive,
 
+    #[error("User is already in an active game")]
+    UserInActiveGame,
+
     #[error("Invalid request: {0}")]
     BadRequest(String),
 
@@ -40,6 +43,7 @@ impl IntoResponse for ApiError {
             ApiError::GameNotFound => (StatusCode::NOT_FOUND, "Game not found"),
             ApiError::PlayerNotFound => (StatusCode::NOT_FOUND, "Player not found"),
             ApiError::GameNotActive => (StatusCode::BAD_REQUEST, "Game is not active"),
+            ApiError::UserInActiveGame => (StatusCode::CONFLICT, "User is already in an active game"),
             ApiError::BadRequest(ref msg) => (StatusCode::BAD_REQUEST, msg.as_str()),
             ApiError::WebSocket(ref msg) => (StatusCode::BAD_REQUEST, msg.as_str()),
             ApiError::Internal(ref e) => {

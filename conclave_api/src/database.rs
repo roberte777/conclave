@@ -78,6 +78,24 @@ pub async fn create_game(
     }
 }
 
+// Check if user is already in any active game
+async fn check_user_in_active_game_in_tx(
+    tx: &mut Transaction<'_, Sqlite>,
+    clerk_user_id: &str,
+) -> Result<bool> {
+    let result = sqlx::query(
+        "SELECT COUNT(*) as count FROM players p 
+         INNER JOIN games g ON p.game_id = g.id 
+         WHERE p.clerk_user_id = ? AND g.status = 'active'",
+    )
+    .bind(clerk_user_id)
+    .fetch_one(&mut **tx)
+    .await?;
+
+    let count: i64 = result.get("count");
+    Ok(count > 0)
+}
+
 // Transaction-safe version of join_game
 async fn join_game_in_tx(
     tx: &mut Transaction<'_, Sqlite>,
@@ -90,6 +108,11 @@ async fn join_game_in_tx(
         return Err(ApiError::BadRequest(
             "Cannot join finished game".to_string(),
         ));
+    }
+
+    // Check if user is already in any active game
+    if check_user_in_active_game_in_tx(tx, clerk_user_id).await? {
+        return Err(ApiError::UserInActiveGame);
     }
 
     // Check if user is already in game
