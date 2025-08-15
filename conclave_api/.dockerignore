@@ -1,0 +1,11 @@
+target/
+Dockerfile
+.dockerignore
+.git
+.gitignore
+*.db
+*.db-shm
+*.db-wal
+fly.toml
+.env
+.env.*

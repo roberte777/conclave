@@ -5,7 +5,9 @@ use sqlx::{Row, Sqlite, SqlitePool, Transaction};
 use uuid::Uuid;
 
 pub async fn create_pool() -> Result<SqlitePool> {
-    let pool = SqlitePool::connect("sqlite:conclave.db?mode=rwc").await?;
+    let database_url = std::env::var("DATABASE_URL")
+        .unwrap_or_else(|_| "sqlite:conclave.db?mode=rwc".to_string());
+    let pool = SqlitePool::connect(&database_url).await?;
     run_migrations(&pool).await?;
     Ok(pool)
 }
