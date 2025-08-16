@@ -19,6 +19,7 @@ struct NavigationRootView: View {
                             .environment(conclave)
                     case .onlineGame:
                         OnlineGameView(screenPath: $screenPath)
+                            .navigationBarBackButtonHidden()
                     case .gameSettings:
                         GameSettingsView(screenPath: $screenPath)
                             .environment(conclave)
