@@ -9,17 +9,32 @@ struct OnlineGameView: View {
         // Current Game Info
         if let game = conclave.currentGame {
             VStack(alignment: .leading, spacing: 4) {
-                Text("📋 \(game.name)")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
+                HStack {
+                    VStack {
+                        Text("📋 \(game.name)")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
 
-                Text("Status: \(game.status.rawValue.capitalized)")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                        Text("Status: \(game.status.rawValue.capitalized)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
 
-                Text("Starting Life: \(game.startingLife)")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                        Text("Starting Life: \(game.startingLife)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Spacer()
+                    Button(action: {
+                        screenPath.append(Screen.gameSettings)
+                    }) {
+                        Image(systemName: "xmark")
+                            .foregroundColor(.primary)
+                            .fontWeight(.bold)
+                            .padding(10)
+                            .background(Circle().fill(.background))
+                    }
+                }
                 playerContainer
             }
         } else {

@@ -19,6 +19,9 @@ struct NavigationRootView: View {
                             .environment(conclave)
                     case .onlineGame:
                         OnlineGameView(screenPath: $screenPath)
+                    case .gameSettings:
+                        GameSettingsView(screenPath: $screenPath)
+                            .environment(conclave)
                     }
                 }
         }

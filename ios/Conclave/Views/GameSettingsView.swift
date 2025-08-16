@@ -2,26 +2,31 @@ import ConclaveKit
 import SwiftUI
 
 struct GameSettingsView: View {
+    @Binding var screenPath: NavigationPath
     @Environment(ConclaveClientManager.self) private var conclave
 
     var body: some View {
-        VStack {
-            Text("Settings").font(.headline)
-            List {
-                Text("Add Guest")
-                Text("Complete Game")
-                Text("Cancel Game")
-                    .onTapGesture(
-                        perform: cancelGame
-                    )
-                Text("Leave Game")
-                    .foregroundStyle(.red)
-                    .onTapGesture(
-                        perform: leaveGame
-                    )
+        if let currentGame = conclave.currentGame {
+            VStack {
+                Text("Settings").font(.headline)
+                List {
+                    Text("Add Guest")
+                    Text("Complete Game")
+                    Text("Cancel Game")
+                        .onTapGesture(
+                            perform: cancelGame
+                        )
+                    Text("Leave Game")
+                        .foregroundStyle(.red)
+                        .onTapGesture(
+                            perform: leaveGame
+                        )
+                }
             }
+            Text(currentGame.name)
+        } else {
+            Text("No current game exists.")
         }
-        Text("Room ID: 123")
     }
 
     private func cancelGame() {
@@ -39,6 +44,7 @@ struct GameSettingsView: View {
                 )
 
                 conclave.clearCurrentGame()
+                screenPath = NavigationPath()
             } catch {
                 print("Failed to leave game: \(error)")
             }
@@ -62,6 +68,7 @@ struct GameSettingsView: View {
                 )
 
                 conclave.clearCurrentGame()
+                screenPath = NavigationPath()
             } catch {
                 print("Failed to leave game: \(error)")
             }
@@ -98,6 +105,6 @@ struct GameSettingsView: View {
         return manager
     }()
 
-    GameSettingsView()
+    GameSettingsView(screenPath: .constant(NavigationPath()))
         .environment(mockManager)
 }

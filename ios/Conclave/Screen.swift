@@ -3,6 +3,7 @@ enum Screen: Hashable {
     case offlineGame
     case userSettings
     case onlineGame
+    case gameSettings
     //case offlineGameSettings
     //case createLobby
     //case lobby
