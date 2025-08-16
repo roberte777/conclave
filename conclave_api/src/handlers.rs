@@ -11,7 +11,7 @@ use axum::{
     http::StatusCode,
 };
 use sqlx::Row;
-use tracing::info;
+use tracing::{debug, info};
 use uuid::Uuid;
 
 // User operations are handled by Clerk, so no local user endpoints needed
@@ -102,6 +102,7 @@ pub async fn get_game(
     State(state): State<AppState>,
     Path(game_id): Path<Uuid>,
 ) -> Result<Json<Game>> {
+    debug!("GET /api/v1/games/{} - Getting game details", game_id);
     let game = database::get_game_by_id(&state.db, game_id).await?;
     Ok(Json(game))
 }
@@ -110,6 +111,7 @@ pub async fn get_game_state(
     State(state): State<AppState>,
     Path(game_id): Path<Uuid>,
 ) -> Result<Json<GameState>> {
+    debug!("GET /api/v1/games/{}/state - Getting game state", game_id);
     let game_state = database::get_game_state(&state.db, game_id).await?;
     Ok(Json(game_state))
 }
@@ -118,6 +120,10 @@ pub async fn get_user_games(
     State(state): State<AppState>,
     Path(clerk_user_id): Path<String>,
 ) -> Result<Json<Vec<GameWithUsers>>> {
+    debug!(
+        "GET /api/v1/users/{}/games - Getting user's games",
+        clerk_user_id
+    );
     let games = database::get_user_games(&state.db, &clerk_user_id).await?;
     Ok(Json(games))
 }
@@ -126,7 +132,17 @@ pub async fn get_available_games(
     State(state): State<AppState>,
     Path(clerk_user_id): Path<String>,
 ) -> Result<Json<Vec<GameWithUsers>>> {
+    debug!(
+        "GET /api/v1/users/{}/available-games - Getting available games for user",
+        clerk_user_id
+    );
     let games = database::get_available_games(&state.db, &clerk_user_id).await?;
+    Ok(Json(games))
+}
+
+pub async fn get_all_games(State(state): State<AppState>) -> Result<Json<Vec<GameWithUsers>>> {
+    debug!("GET /api/v1/games - Getting all games");
+    let games = database::get_all_games(&state.db).await?;
     Ok(Json(games))
 }
 
@@ -202,6 +218,10 @@ pub async fn get_user_history(
     State(state): State<AppState>,
     Path(clerk_user_id): Path<String>,
 ) -> Result<Json<GameHistory>> {
+    debug!(
+        "GET /api/v1/users/{}/history - Getting user's game history",
+        clerk_user_id
+    );
     let history = database::get_user_game_history(&state.db, &clerk_user_id).await?;
     Ok(Json(history))
 }
@@ -210,11 +230,16 @@ pub async fn get_recent_life_changes(
     State(state): State<AppState>,
     Path(game_id): Path<Uuid>,
 ) -> Result<Json<Vec<LifeChange>>> {
+    debug!(
+        "GET /api/v1/games/{}/life-changes - Getting recent life changes",
+        game_id
+    );
     let changes = database::get_recent_life_changes(&state.db, game_id, 50).await?;
     Ok(Json(changes))
 }
 
 pub async fn health_check() -> Result<Json<serde_json::Value>> {
+    debug!("GET /health - Health check endpoint called");
     Ok(Json(serde_json::json!({
         "status": "ok",
         "service": "conclave-api"
@@ -222,6 +247,7 @@ pub async fn health_check() -> Result<Json<serde_json::Value>> {
 }
 
 pub async fn get_stats(State(state): State<AppState>) -> Result<Json<serde_json::Value>> {
+    debug!("GET /api/v1/stats - Getting API statistics");
     let active_games_count =
         sqlx::query("SELECT COUNT(*) as count FROM games WHERE status = 'active'")
             .fetch_one(&state.db)

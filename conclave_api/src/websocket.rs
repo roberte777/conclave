@@ -187,28 +187,59 @@ async fn send_initial_game_state(
 }
 
 async fn handle_websocket_message(text: &str, game_id: Uuid, state: &AppState) -> Result<()> {
+    debug!("WebSocket message received for game {}: {}", game_id, text);
+
     let request: WebSocketRequest =
         serde_json::from_str(text).map_err(|_| ApiError::BadRequest("Invalid JSON".to_string()))?;
+
+    debug!(
+        "Parsed WebSocket request for game {}: {:?}",
+        game_id, request
+    );
 
     match request {
         WebSocketRequest::UpdateLife {
             player_id,
             change_amount,
-        } => handle_life_update(player_id, change_amount, game_id, state).await,
+        } => {
+            debug!(
+                "WebSocket UpdateLife: player_id={}, change_amount={}, game_id={}",
+                player_id, change_amount, game_id
+            );
+            handle_life_update(player_id, change_amount, game_id, state).await
+        }
         WebSocketRequest::JoinGame { clerk_user_id } => {
+            debug!(
+                "WebSocket JoinGame: clerk_user_id={}, game_id={}",
+                clerk_user_id, game_id
+            );
             handle_join_game(&clerk_user_id, game_id, state).await
         }
         WebSocketRequest::LeaveGame { player_id } => {
+            debug!(
+                "WebSocket LeaveGame: player_id={}, game_id={}",
+                player_id, game_id
+            );
             handle_leave_game(player_id, game_id, state).await
         }
-        WebSocketRequest::GetGameState => handle_get_game_state(game_id, state).await,
-        WebSocketRequest::EndGame => handle_end_game(game_id, state).await,
+        WebSocketRequest::GetGameState => {
+            debug!("WebSocket GetGameState: game_id={}", game_id);
+            handle_get_game_state(game_id, state).await
+        }
+        WebSocketRequest::EndGame => {
+            debug!("WebSocket EndGame: game_id={}", game_id);
+            handle_end_game(game_id, state).await
+        }
         WebSocketRequest::SetCommanderDamage {
             from_player_id,
             to_player_id,
             commander_number,
             new_damage,
         } => {
+            debug!(
+                "WebSocket SetCommanderDamage: from_player_id={}, to_player_id={}, commander_number={}, new_damage={}, game_id={}",
+                from_player_id, to_player_id, commander_number, new_damage, game_id
+            );
             handle_set_commander_damage(
                 from_player_id,
                 to_player_id,
@@ -225,6 +256,10 @@ async fn handle_websocket_message(text: &str, game_id: Uuid, state: &AppState) -
             commander_number,
             damage_amount,
         } => {
+            debug!(
+                "WebSocket UpdateCommanderDamage: from_player_id={}, to_player_id={}, commander_number={}, damage_amount={}, game_id={}",
+                from_player_id, to_player_id, commander_number, damage_amount, game_id
+            );
             handle_update_commander_damage(
                 from_player_id,
                 to_player_id,
@@ -238,7 +273,13 @@ async fn handle_websocket_message(text: &str, game_id: Uuid, state: &AppState) -
         WebSocketRequest::TogglePartner {
             player_id,
             enable_partner,
-        } => handle_toggle_partner(player_id, enable_partner, game_id, state).await,
+        } => {
+            debug!(
+                "WebSocket TogglePartner: player_id={}, enable_partner={}, game_id={}",
+                player_id, enable_partner, game_id
+            );
+            handle_toggle_partner(player_id, enable_partner, game_id, state).await
+        }
     }
 }
 
