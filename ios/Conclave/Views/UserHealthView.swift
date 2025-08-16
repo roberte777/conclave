@@ -172,9 +172,29 @@ struct UserHealthView: View {
                         .environment(conclave)
                     }
                 }
-                VStack {
-                    Text("\(player.clerkUserId)")
-                    Spacer()
+                let healthText = Text("\(player.clerkUserId)")
+                    .rotationEffect(Angle(degrees: lifeOrientation.rawValue))
+                switch lifeOrientation {
+                case .Up:
+                    VStack {
+                        healthText
+                        Spacer()
+                    }
+                case .Left:
+                    HStack {
+                        Spacer()
+                        healthText
+                    }
+                case .Right:
+                    HStack {
+                        healthText
+                        Spacer()
+                    }
+                case .Down:
+                    VStack {
+                        Spacer()
+                        healthText
+                    }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -190,7 +210,7 @@ struct UserHealthView: View {
             UserHealthView(
                 mockManager.allPlayers[0],
                 .red,
-                lifeOrientation: .Up
+                lifeOrientation: .Left
             )
             .environment(mockManager)
         }
