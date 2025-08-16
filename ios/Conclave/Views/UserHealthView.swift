@@ -9,24 +9,24 @@ enum LifeOrientation: Double {
 }
 
 struct UserHealthView: View {
-    @State var healthColor: Color
-    @State var lifeOrientation: LifeOrientation
-    @Binding var player: Player
+    var healthColor: Color
+    var lifeOrientation: LifeOrientation
+    var player: Player
     @Environment(ConclaveClientManager.self) private var conclave
 
     init(
-        _ player: Binding<Player>,
+        _ player: Player,
         _ healthColor: SwiftUICore.Color,
         lifeOrientation: LifeOrientation = .Up,
     ) {
-        _player = player
+        self.player = player
         self.healthColor = healthColor
         self.lifeOrientation = lifeOrientation
     }
 
     struct HealthButtons: View {
-        @Binding var player: Player
-        @Binding var givenLifeOrientation: LifeOrientation
+        var player: Player
+        var givenLifeOrientation: LifeOrientation
         @State private var leftHoldTimer: Timer?
         @State private var rightHoldTimer: Timer?
         @Environment(ConclaveClientManager.self) private var conclave
@@ -158,16 +158,16 @@ struct UserHealthView: View {
                 if lifeOrientation == .Left || lifeOrientation == .Right {
                     VStack(spacing: 0) {
                         HealthButtons(
-                            player: $player,
-                            givenLifeOrientation: $lifeOrientation
+                            player: player,
+                            givenLifeOrientation: lifeOrientation
                         )
                         .environment(conclave)
                     }
                 } else {
                     HStack(spacing: 0) {
                         HealthButtons(
-                            player: $player,
-                            givenLifeOrientation: $lifeOrientation
+                            player: player,
+                            givenLifeOrientation: lifeOrientation
                         )
                         .environment(conclave)
                     }
@@ -188,7 +188,7 @@ struct UserHealthView: View {
     if mockManager.isConnectedToWebSocket {
         HStack {
             UserHealthView(
-                $mockManager.allPlayers[0],
+                mockManager.allPlayers[0],
                 .red,
                 lifeOrientation: .Up
             )
