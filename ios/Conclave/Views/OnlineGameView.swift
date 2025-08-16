@@ -6,6 +6,32 @@ struct OnlineGameView: View {
     @Environment(ConclaveClientManager.self) private var conclave
 
     var body: some View {
+        // Current Game Info
+        if let game = conclave.currentGame {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("📋 \(game.name)")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+
+                Text("Status: \(game.status.rawValue.capitalized)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                Text("Starting Life: \(game.startingLife)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                playerContainer
+            }
+        } else {
+            Text("No active game")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+        }
+
+    }
+
+    @ViewBuilder
+    private var playerContainer: some View {
         switch conclave.allPlayers.count {
         case 1:
             UserHealthView(
