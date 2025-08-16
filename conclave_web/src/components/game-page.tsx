@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { ConclaveAPI, type GameState, type Player } from "@/lib/api";
 import Image from "next/image";
 
@@ -312,66 +311,52 @@ export function GamePageClient({ gameId, clerkUserId }: GamePageClientProps) {
                                     </div>
                                 </div>
                             </div>
+
+                            {/* Commander damage controls inline per player */}
+                            {state && state.players.length > 1 ? (
+                                <div className="mt-4">
+                                    <div className="text-sm font-medium mb-2">Commander damage dealt</div>
+                                    <div className="flex gap-3 overflow-x-auto">
+                                        {state.players
+                                            .filter((to) => to.id !== p.id)
+                                            .map((to) => (
+                                                <div key={to.id} className="border rounded-md p-2 min-w-[140px]">
+                                                    <div className="text-xs mb-1">to P{to.position}</div>
+                                                    {[1, ...(partnerEnabled[p.id] ? [2] : [])].map((cmd) => (
+                                                        <div key={cmd} className="flex items-center justify-between gap-2">
+                                                            <span className="text-xs">
+                                                                C{cmd}: {getCommanderDamage(p.id, to.id, cmd)}
+                                                            </span>
+                                                            <div className="flex gap-1">
+                                                                <Button
+                                                                    size="icon"
+                                                                    variant="secondary"
+                                                                    className="h-7 w-7"
+                                                                    onClick={() => changeCommanderDamage(p.id, to.id, cmd, -1)}
+                                                                    disabled={!isConnected}
+                                                                >
+                                                                    -
+                                                                </Button>
+                                                                <Button
+                                                                    size="icon"
+                                                                    className="h-7 w-7"
+                                                                    onClick={() => changeCommanderDamage(p.id, to.id, cmd, +1)}
+                                                                    disabled={!isConnected}
+                                                                >
+                                                                    +
+                                                                </Button>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ))}
+                                    </div>
+                                </div>
+                            ) : null}
                         </CardContent>
                     </Card>
                 ))}
             </div>
-
-            <Separator className="my-8" />
-
-            {state && state.players.length > 1 && (
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Commander Damage</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr>
-                                        <th className="text-left p-2">From \ To</th>
-                                        {state.players.map((to) => (
-                                            <th key={to.id} className="p-2 text-left">
-                                                P{to.position}
-                                            </th>
-                                        ))}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {state.players.map((from) => (
-                                        <tr key={from.id} className="border-t">
-                                            <td className="p-2 font-medium">P{from.position}</td>
-                                            {state.players.map((to) => (
-                                                <td key={`${from.id}-${to.id}`} className="p-2 align-top">
-                                                    {from.id === to.id ? (
-                                                        <span className="text-muted-foreground">—</span>
-                                                    ) : (
-                                                        <div className="space-y-2">
-                                                            {[1, 2].map((cmd) => (
-                                                                <div key={cmd} className="flex items-center justify-between gap-2">
-                                                                    <span className="text-xs">C{cmd}: {getCommanderDamage(from.id, to.id, cmd)}</span>
-                                                                    <div className="flex gap-1">
-                                                                        <Button size="icon" variant="secondary" className="h-7 w-7" onClick={() => changeCommanderDamage(from.id, to.id, cmd, -1)} disabled={!isConnected}>
-                                                                            -
-                                                                        </Button>
-                                                                        <Button size="icon" className="h-7 w-7" onClick={() => changeCommanderDamage(from.id, to.id, cmd, +1)} disabled={!isConnected}>
-                                                                            +
-                                                                        </Button>
-                                                                    </div>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    )}
-                                                </td>
-                                            ))}
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
         </div>
     );
 }
