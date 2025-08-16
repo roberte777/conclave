@@ -9,10 +9,6 @@ enum AppEnvironment {
 
     @MainActor
     static func setupConfiguration() {
-        #if DEBUG
-            ConclaveKit.setConfiguration(.development)
-        #else
-            ConclaveKit.setConfiguration(.production)
-        #endif
+        ConclaveKit.setConfiguration(.production)
     }
 }

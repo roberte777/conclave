@@ -31,6 +31,9 @@ public class ConclaveClientManager {
     /// Current game information
     public var currentGame: Game?
 
+    /// All games in the database NOTE: Development testing
+    public var allGames: [GameWithUsers] = []
+
     /// Current player (the user's player in the game)
     public var currentPlayer: Player?
 
@@ -73,6 +76,17 @@ public class ConclaveClientManager {
     }
 
     // MARK: - Game Management
+
+    public func getAllGames() async throws {
+        setLoading(true)
+        clearError()
+
+        do {
+            allGames = try await client.getAllGames()
+        } catch {
+            handleError(error)
+        }
+    }
 
     public func createGame(
         name: String,
@@ -436,12 +450,15 @@ public class ConclaveClientManager {
     }
 
     @MainActor
-    private func handleCommanderDamageUpdate(_ message: CommanderDamageUpdateMessage) {
+    private func handleCommanderDamageUpdate(
+        _ message: CommanderDamageUpdateMessage
+    ) {
         // Log commander damage update for now
         // In a full implementation, this would update commander damage state
         ConclaveLogger.shared.logStateChange(
             "Commander damage updated",
-            details: "From player \(message.fromPlayerId) to \(message.toPlayerId) | Commander \(message.commanderNumber) | Damage: \(message.newDamage)"
+            details:
+                "From player \(message.fromPlayerId) to \(message.toPlayerId) | Commander \(message.commanderNumber) | Damage: \(message.newDamage)"
         )
     }
 
@@ -451,7 +468,8 @@ public class ConclaveClientManager {
         // In a full implementation, this would update player partner status
         ConclaveLogger.shared.logStateChange(
             "Partner toggled",
-            details: "Player \(message.playerId) | Has partner: \(message.hasPartner)"
+            details:
+                "Player \(message.playerId) | Has partner: \(message.hasPartner)"
         )
     }
 

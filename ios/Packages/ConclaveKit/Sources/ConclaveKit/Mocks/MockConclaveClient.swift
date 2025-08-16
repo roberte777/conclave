@@ -326,6 +326,66 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
         return [GameWithUsers(game: mockGame, users: users)]
     }
 
+    public func getAllGames() async throws -> [GameWithUsers] {
+        await simulateNetworkDelay()
+
+        if shouldSimulateError() {
+            throw ConclaveError.networkError(URLError(.networkConnectionLost))
+        }
+
+        // Return mock available games
+        let mockGame1 = Game(
+            id: generateMockGameId(),
+            name: "Mock Game 1",
+            status: .active,
+            startingLife: 40,
+            createdAt: Date().addingTimeInterval(-600),
+            finishedAt: nil
+        )
+
+        let mockGame2 = Game(
+            id: generateMockGameId(),
+            name: "Mock Game 2",
+            status: .active,
+            startingLife: 60,
+            createdAt: Date().addingTimeInterval(-800),
+            finishedAt: nil
+        )
+
+        let mockGame3 = Game(
+            id: generateMockGameId(),
+            name: "Mock Game 3",
+            status: .finished,
+            startingLife: 40,
+            createdAt: Date().addingTimeInterval(-800),
+            finishedAt: Date()
+        )
+
+        let users1 = [
+            UserInfo(clerkUserId: "mock_host"),
+            UserInfo(clerkUserId: "mock_player_1"),
+        ]
+
+        let users2 = [
+            UserInfo(clerkUserId: "mock_host"),
+            UserInfo(clerkUserId: "mock_player_2"),
+            UserInfo(clerkUserId: "mock_player_3"),
+            UserInfo(clerkUserId: "mock_player_4"),
+        ]
+
+        let users3 = [
+            UserInfo(clerkUserId: "mock_host"),
+            UserInfo(clerkUserId: "mock_player_2"),
+            UserInfo(clerkUserId: "mock_player_3"),
+        ]
+
+        return [
+            GameWithUsers(game: mockGame1, users: users1),
+            GameWithUsers(game: mockGame2, users: users2),
+            GameWithUsers(game: mockGame3, users: users3),
+        ]
+    }
+
     public func createGame(request: CreateGameRequest) async throws -> Game {
         await simulateNetworkDelay()
 
@@ -394,7 +454,7 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
             game: game,
             players: players,
             recentChanges: Array(recentChanges.prefix(10)),
-            commanderDamage: [] // Mock empty commander damage array
+            commanderDamage: []  // Mock empty commander damage array
         )
     }
 
@@ -533,7 +593,10 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
 
     // MARK: - Commander Damage API Implementation
 
-    public func updateCommanderDamage(gameId: UUID, request: UpdateCommanderDamageRequest) async throws -> CommanderDamage {
+    public func updateCommanderDamage(
+        gameId: UUID,
+        request: UpdateCommanderDamageRequest
+    ) async throws -> CommanderDamage {
         await simulateNetworkDelay()
 
         if shouldSimulateError() {
@@ -555,7 +618,11 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
         return commanderDamage
     }
 
-    public func togglePartner(gameId: UUID, playerId: UUID, request: TogglePartnerRequest) async throws {
+    public func togglePartner(
+        gameId: UUID,
+        playerId: UUID,
+        request: TogglePartnerRequest
+    ) async throws {
         await simulateNetworkDelay()
 
         if shouldSimulateError() {
@@ -635,7 +702,12 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
             try await handleMockGetGameState(gameId: gameId)
         case .endGame:
             try await handleMockEndGame(gameId: gameId)
-        case .setCommanderDamage(let fromPlayerId, let toPlayerId, let commanderNumber, let newDamage):
+        case .setCommanderDamage(
+            let fromPlayerId,
+            let toPlayerId,
+            let commanderNumber,
+            let newDamage
+        ):
             try await handleMockSetCommanderDamage(
                 gameId: gameId,
                 fromPlayerId: fromPlayerId,
@@ -643,7 +715,12 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
                 commanderNumber: commanderNumber,
                 newDamage: newDamage
             )
-        case .updateCommanderDamage(let fromPlayerId, let toPlayerId, let commanderNumber, let damageAmount):
+        case .updateCommanderDamage(
+            let fromPlayerId,
+            let toPlayerId,
+            let commanderNumber,
+            let damageAmount
+        ):
             try await handleMockUpdateCommanderDamage(
                 gameId: gameId,
                 fromPlayerId: fromPlayerId,
@@ -690,7 +767,12 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
 
     // MARK: - Commander Damage WebSocket Implementation
 
-    public func setCommanderDamage(fromPlayerId: UUID, toPlayerId: UUID, commanderNumber: Int32, newDamage: Int32) async throws {
+    public func setCommanderDamage(
+        fromPlayerId: UUID,
+        toPlayerId: UUID,
+        commanderNumber: Int32,
+        newDamage: Int32
+    ) async throws {
         let message = ClientMessage.setCommanderDamage(
             fromPlayerId: fromPlayerId,
             toPlayerId: toPlayerId,
@@ -700,7 +782,12 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
         try await sendMessage(message)
     }
 
-    public func updateCommanderDamage(fromPlayerId: UUID, toPlayerId: UUID, commanderNumber: Int32, damageAmount: Int32) async throws {
+    public func updateCommanderDamage(
+        fromPlayerId: UUID,
+        toPlayerId: UUID,
+        commanderNumber: Int32,
+        damageAmount: Int32
+    ) async throws {
         let message = ClientMessage.updateCommanderDamage(
             fromPlayerId: fromPlayerId,
             toPlayerId: toPlayerId,
@@ -710,7 +797,8 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
         try await sendMessage(message)
     }
 
-    public func togglePartner(playerId: UUID, enablePartner: Bool) async throws {
+    public func togglePartner(playerId: UUID, enablePartner: Bool) async throws
+    {
         let message = ClientMessage.togglePartner(
             playerId: playerId,
             enablePartner: enablePartner
@@ -794,7 +882,7 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
             toPlayerId: toPlayerId,
             commanderNumber: commanderNumber,
             newDamage: newDamage,
-            damageAmount: 0 // Set damage for "set" operation
+            damageAmount: 0  // Set damage for "set" operation
         )
         await mockState.broadcastMessage(.commanderDamageUpdate(message))
     }
@@ -812,7 +900,7 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
             fromPlayerId: fromPlayerId,
             toPlayerId: toPlayerId,
             commanderNumber: commanderNumber,
-            newDamage: damageAmount, // For updates, this would be calculated
+            newDamage: damageAmount,  // For updates, this would be calculated
             damageAmount: damageAmount
         )
         await mockState.broadcastMessage(.commanderDamageUpdate(message))

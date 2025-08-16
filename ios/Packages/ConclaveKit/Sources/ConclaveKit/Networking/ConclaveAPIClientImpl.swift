@@ -51,6 +51,13 @@ public final class ConclaveAPIClientImpl: ConclaveClient, Sendable {
         try await httpClient.getAvailableGames(clerkUserId: clerkUserId)
     }
 
+    // NOTE: Development testing
+    public func getAllGames() async throws
+        -> [GameWithUsers]
+    {
+        try await httpClient.getAllGames()
+    }
+
     public func createGame(request: CreateGameRequest) async throws -> Game {
         try await httpClient.createGame(request: request)
     }
@@ -89,13 +96,27 @@ public final class ConclaveAPIClientImpl: ConclaveClient, Sendable {
     }
 
     // MARK: - Commander Damage API Implementation
-    
-    public func updateCommanderDamage(gameId: UUID, request: UpdateCommanderDamageRequest) async throws -> CommanderDamage {
-        try await httpClient.updateCommanderDamage(gameId: gameId, request: request)
+
+    public func updateCommanderDamage(
+        gameId: UUID,
+        request: UpdateCommanderDamageRequest
+    ) async throws -> CommanderDamage {
+        try await httpClient.updateCommanderDamage(
+            gameId: gameId,
+            request: request
+        )
     }
-    
-    public func togglePartner(gameId: UUID, playerId: UUID, request: TogglePartnerRequest) async throws {
-        try await httpClient.togglePartner(gameId: gameId, playerId: playerId, request: request)
+
+    public func togglePartner(
+        gameId: UUID,
+        playerId: UUID,
+        request: TogglePartnerRequest
+    ) async throws {
+        try await httpClient.togglePartner(
+            gameId: gameId,
+            playerId: playerId,
+            request: request
+        )
     }
 
     // MARK: - ConclaveWebSocketClient Implementation
@@ -151,16 +172,40 @@ public final class ConclaveAPIClientImpl: ConclaveClient, Sendable {
     }
 
     // MARK: - Commander Damage WebSocket Implementation
-    
-    public func setCommanderDamage(fromPlayerId: UUID, toPlayerId: UUID, commanderNumber: Int32, newDamage: Int32) async throws {
-        try await webSocketClient.setCommanderDamage(fromPlayerId: fromPlayerId, toPlayerId: toPlayerId, commanderNumber: commanderNumber, newDamage: newDamage)
+
+    public func setCommanderDamage(
+        fromPlayerId: UUID,
+        toPlayerId: UUID,
+        commanderNumber: Int32,
+        newDamage: Int32
+    ) async throws {
+        try await webSocketClient.setCommanderDamage(
+            fromPlayerId: fromPlayerId,
+            toPlayerId: toPlayerId,
+            commanderNumber: commanderNumber,
+            newDamage: newDamage
+        )
     }
-    
-    public func updateCommanderDamage(fromPlayerId: UUID, toPlayerId: UUID, commanderNumber: Int32, damageAmount: Int32) async throws {
-        try await webSocketClient.updateCommanderDamage(fromPlayerId: fromPlayerId, toPlayerId: toPlayerId, commanderNumber: commanderNumber, damageAmount: damageAmount)
+
+    public func updateCommanderDamage(
+        fromPlayerId: UUID,
+        toPlayerId: UUID,
+        commanderNumber: Int32,
+        damageAmount: Int32
+    ) async throws {
+        try await webSocketClient.updateCommanderDamage(
+            fromPlayerId: fromPlayerId,
+            toPlayerId: toPlayerId,
+            commanderNumber: commanderNumber,
+            damageAmount: damageAmount
+        )
     }
-    
-    public func togglePartner(playerId: UUID, enablePartner: Bool) async throws {
-        try await webSocketClient.togglePartner(playerId: playerId, enablePartner: enablePartner)
+
+    public func togglePartner(playerId: UUID, enablePartner: Bool) async throws
+    {
+        try await webSocketClient.togglePartner(
+            playerId: playerId,
+            enablePartner: enablePartner
+        )
     }
 }
