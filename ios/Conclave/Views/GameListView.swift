@@ -124,10 +124,16 @@ struct GameListView: View {
 
     private func joinGame(gameId: UUID, userName: String) async {
         do {
-            _ = try await conclave.joinGame(
+            let game = try await conclave.joinGame(
                 gameId: gameId,
                 clerkUserId: userName
             )
+            try await conclave
+                .connectToWebSocket(
+                    gameId: game.id,
+                    clerkUserId: userName
+                )
+            screenPath.append(Screen.onlineGame)
         } catch {
             print("Failed to join game: \(error)")
         }
