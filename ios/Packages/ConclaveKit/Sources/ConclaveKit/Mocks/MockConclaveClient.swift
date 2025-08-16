@@ -659,8 +659,10 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
         do {
             let gameState = try await getGameState(gameId: gameId)
             let message = GameStartedMessage(
-                gameId: gameId,
-                players: gameState.players
+                game: gameState.game,
+                players: gameState.players,
+                recentChanges: gameState.recentChanges,
+                commanderDamage: gameState.commanderDamage
             )
             await mockState.broadcastMessage(.gameStarted(message))
         } catch {
@@ -858,8 +860,10 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
     private func handleMockGetGameState(gameId: UUID) async throws {
         let gameState = try await getGameState(gameId: gameId)
         let message = GameStartedMessage(
-            gameId: gameId,
-            players: gameState.players
+            game: gameState.game,
+            players: gameState.players,
+            recentChanges: gameState.recentChanges,
+            commanderDamage: gameState.commanderDamage
         )
         await mockState.broadcastMessage(.gameStarted(message))
     }
