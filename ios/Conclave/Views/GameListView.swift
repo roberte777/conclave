@@ -129,8 +129,10 @@ struct GameListView: View {
                     gameId: gameId,
                     clerkUserId: userName
                 )
+            let game = try await conclave.loadGame(gameId: gameId)
+            print("HELLO! \(game.name)")
             let _ = try await conclave.joinGame(
-                gameId: gameId,
+                gameId: game.id,
                 clerkUserId: userName
             )
             screenPath.append(Screen.onlineGame)
