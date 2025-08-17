@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConclaveAPI, type GameState, type Player } from "@/lib/api";
 import Image from "next/image";
+import { Swords } from "lucide-react";
 
 interface GamePageClientProps {
     gameId: string;
@@ -22,6 +23,7 @@ export function GamePageClient({ gameId, clerkUserId }: GamePageClientProps) {
     const [partnerEnabled, setPartnerEnabled] = useState<PartnerState>({});
     const [winner, setWinner] = useState<Player | null>(null);
     const [userNames, setUserNames] = useState<Record<string, { name: string; imageUrl?: string }>>({});
+    const [showIncomingDamage, setShowIncomingDamage] = useState<Record<string, boolean>>({});
 
     // Establish websocket connection and wire up handlers
     useEffect(() => {
@@ -281,9 +283,23 @@ export function GamePageClient({ gameId, clerkUserId }: GamePageClientProps) {
                                         P{p.position}: {getDisplayName(p.clerkUserId)}
                                     </span>
                                 </span>
-                                <Button size="sm" variant={partnerEnabled[p.id] ? "default" : "outline"} onClick={() => togglePartner(p.id)} disabled={!isConnected}>
-                                    {partnerEnabled[p.id] ? "Partner On" : "Partner Off"}
-                                </Button>
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        size="icon"
+                                        variant={showIncomingDamage[p.id] ? "default" : "outline"}
+                                        className="h-8 w-8"
+                                        onClick={() =>
+                                            setShowIncomingDamage((prev) => ({ ...prev, [p.id]: !prev[p.id] }))
+                                        }
+                                        disabled={!isConnected}
+                                        title={showIncomingDamage[p.id] ? "Hide commander damage" : "Show commander damage"}
+                                    >
+                                        <Swords className="h-4 w-4" />
+                                    </Button>
+                                    <Button size="sm" variant={partnerEnabled[p.id] ? "default" : "outline"} onClick={() => togglePartner(p.id)} disabled={!isConnected}>
+                                        {partnerEnabled[p.id] ? "Partner On" : "Partner Off"}
+                                    </Button>
+                                </div>
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
@@ -312,27 +328,27 @@ export function GamePageClient({ gameId, clerkUserId }: GamePageClientProps) {
                                 </div>
                             </div>
 
-                            {/* Commander damage controls inline per player */}
-                            {state && state.players.length > 1 ? (
+                            {/* Commander damage (incoming) - hidden by default and toggled via swords icon */}
+                            {state && state.players.length > 1 && showIncomingDamage[p.id] ? (
                                 <div className="mt-4">
-                                    <div className="text-sm font-medium mb-2">Commander damage dealt</div>
+                                    <div className="text-sm font-medium mb-2">Incoming commander damage</div>
                                     <div className="flex gap-3 overflow-x-auto">
                                         {state.players
-                                            .filter((to) => to.id !== p.id)
-                                            .map((to) => (
-                                                <div key={to.id} className="border rounded-md p-2 min-w-[140px]">
-                                                    <div className="text-xs mb-1">to P{to.position}</div>
-                                                    {[1, ...(partnerEnabled[p.id] ? [2] : [])].map((cmd) => (
+                                            .filter((from) => from.id !== p.id)
+                                            .map((from) => (
+                                                <div key={from.id} className="border rounded-md p-2 min-w-[160px]">
+                                                    <div className="text-xs mb-1">from P{from.position}</div>
+                                                    {[1, ...(partnerEnabled[from.id] ? [2] : [])].map((cmd) => (
                                                         <div key={cmd} className="flex items-center justify-between gap-2">
                                                             <span className="text-xs">
-                                                                C{cmd}: {getCommanderDamage(p.id, to.id, cmd)}
+                                                                C{cmd}: {getCommanderDamage(from.id, p.id, cmd)}
                                                             </span>
                                                             <div className="flex gap-1">
                                                                 <Button
                                                                     size="icon"
                                                                     variant="secondary"
                                                                     className="h-7 w-7"
-                                                                    onClick={() => changeCommanderDamage(p.id, to.id, cmd, -1)}
+                                                                    onClick={() => changeCommanderDamage(from.id, p.id, cmd, -1)}
                                                                     disabled={!isConnected}
                                                                 >
                                                                     -
@@ -340,7 +356,7 @@ export function GamePageClient({ gameId, clerkUserId }: GamePageClientProps) {
                                                                 <Button
                                                                     size="icon"
                                                                     className="h-7 w-7"
-                                                                    onClick={() => changeCommanderDamage(p.id, to.id, cmd, +1)}
+                                                                    onClick={() => changeCommanderDamage(from.id, p.id, cmd, +1)}
                                                                     disabled={!isConnected}
                                                                 >
                                                                     +

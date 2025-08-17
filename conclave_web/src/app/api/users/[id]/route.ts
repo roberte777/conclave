@@ -5,11 +5,12 @@ export const dynamic = "force-dynamic";
 
 export async function GET(
     _req: Request,
-    { params }: { params: { id: string } }
+    context: { params: Promise<{ id: string }> }
 ) {
     try {
+        const { id } = await context.params;
         const client = await clerkClient();
-        const user = await client.users.getUser(params.id);
+        const user = await client.users.getUser(id);
         const fullName =
             user.fullName ||
             [user.firstName, user.lastName].filter(Boolean).join(" ") ||
