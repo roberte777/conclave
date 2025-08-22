@@ -35,7 +35,12 @@ export default function RootLayout({
 }>) {
 
   return (
-    <ClerkProvider>
+    <ClerkProvider
+      afterSignInUrl="/"
+      afterSignUpUrl="/"
+      signInUrl="/sign-in"
+      signUpUrl="/sign-up"
+    >
       <html lang="en">
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased font-sans`}
@@ -48,12 +53,20 @@ export default function RootLayout({
             </div>
             <div className="flex items-center gap-4">
               <SignedOut>
-                <SignInButton mode="modal">
+                <SignInButton 
+                  mode="redirect"
+                  redirectUrl="/"
+                  fallbackRedirectUrl="/"
+                >
                   <button className="text-sm font-medium hover:text-primary transition-colors">
                     Sign In
                   </button>
                 </SignInButton>
-                <SignUpButton mode="modal">
+                <SignUpButton 
+                  mode="redirect"
+                  redirectUrl="/"
+                  fallbackRedirectUrl="/"
+                >
                   <button className="bg-primary text-primary-foreground rounded-md font-medium text-sm h-9 px-4 hover:bg-primary/90 transition-colors">
                     Get Started
                   </button>

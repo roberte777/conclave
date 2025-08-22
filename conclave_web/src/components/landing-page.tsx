@@ -16,12 +16,20 @@ export function LandingPage() {
             Track life totals, manage games, and sync across all your devices.
           </p>
           <div className="flex gap-4 justify-center">
-            <SignInButton mode="modal">
+            <SignInButton 
+              mode="redirect"
+              redirectUrl="/"
+              fallbackRedirectUrl="/"
+            >
               <Button size="lg" className="font-semibold">
                 Get Started
               </Button>
             </SignInButton>
-            <SignInButton mode="modal">
+            <SignInButton 
+              mode="redirect"
+              redirectUrl="/"
+              fallbackRedirectUrl="/"
+            >
               <Button size="lg" variant="outline">
                 Sign In
               </Button>
