@@ -10,6 +10,7 @@ public protocol ConclaveAPIClient: Sendable {
     func getUserHistory(clerkUserId: String) async throws -> GameHistory
     func getUserGames(clerkUserId: String) async throws -> [GameWithUsers]
     func getAvailableGames(clerkUserId: String) async throws -> [GameWithUsers]
+    func getAllGames() async throws -> [GameWithUsers]
 
     // MARK: - Game Endpoints
     func createGame(request: CreateGameRequest) async throws -> Game
@@ -21,10 +22,17 @@ public protocol ConclaveAPIClient: Sendable {
         -> Player
     func endGame(gameId: UUID) async throws -> Game
     func getRecentLifeChanges(gameId: UUID) async throws -> [LifeChange]
-    
+
     // MARK: - Commander Damage Endpoints
-    func updateCommanderDamage(gameId: UUID, request: UpdateCommanderDamageRequest) async throws -> CommanderDamage
-    func togglePartner(gameId: UUID, playerId: UUID, request: TogglePartnerRequest) async throws
+    func updateCommanderDamage(
+        gameId: UUID,
+        request: UpdateCommanderDamageRequest
+    ) async throws -> CommanderDamage
+    func togglePartner(
+        gameId: UUID,
+        playerId: UUID,
+        request: TogglePartnerRequest
+    ) async throws
 }
 
 public protocol ConclaveWebSocketClient: Sendable {
@@ -43,10 +51,20 @@ public protocol ConclaveWebSocketClient: Sendable {
     func leaveGame(playerId: UUID) async throws
     func getGameState() async throws
     func endGame() async throws
-    
+
     // MARK: - Commander Damage WebSocket Methods
-    func setCommanderDamage(fromPlayerId: UUID, toPlayerId: UUID, commanderNumber: Int32, newDamage: Int32) async throws
-    func updateCommanderDamage(fromPlayerId: UUID, toPlayerId: UUID, commanderNumber: Int32, damageAmount: Int32) async throws
+    func setCommanderDamage(
+        fromPlayerId: UUID,
+        toPlayerId: UUID,
+        commanderNumber: Int32,
+        newDamage: Int32
+    ) async throws
+    func updateCommanderDamage(
+        fromPlayerId: UUID,
+        toPlayerId: UUID,
+        commanderNumber: Int32,
+        damageAmount: Int32
+    ) async throws
     func togglePartner(playerId: UUID, enablePartner: Bool) async throws
 }
 

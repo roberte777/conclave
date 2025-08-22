@@ -1,3 +1,4 @@
+import ConclaveKit
 import SwiftUI
 
 enum LifeOrientation: Double {
@@ -8,42 +9,57 @@ enum LifeOrientation: Double {
 }
 
 struct UserHealthView: View {
-    @State var healthColor: Color
-    @State var healthTotal: Int
-    @State var lifeOrientation: LifeOrientation
+    var healthColor: Color
+    var lifeOrientation: LifeOrientation
+    var player: Player
+    @Environment(ConclaveClientManager.self) private var conclave
 
     init(
+        _ player: Player,
         _ healthColor: SwiftUICore.Color,
-        lifeOrientation: LifeOrientation = .Up
+        lifeOrientation: LifeOrientation = .Up,
     ) {
+        self.player = player
         self.healthColor = healthColor
-        self.healthTotal = 40
         self.lifeOrientation = lifeOrientation
-
     }
 
     struct HealthButtons: View {
-        @Binding var givenHealthTotal: Int
-        @Binding var givenLifeOrientation: LifeOrientation
+        var player: Player
+        var givenLifeOrientation: LifeOrientation
         @State private var leftHoldTimer: Timer?
         @State private var rightHoldTimer: Timer?
+        @Environment(ConclaveClientManager.self) private var conclave
+
+        private func changeHealth(_ healthChange: Int32) {
+            Task {
+                do {
+                    try await conclave.sendLifeUpdate(
+                        playerId: player.id,
+                        changeAmount: healthChange
+                    )
+                } catch {
+                    print("\(error)")
+                }
+            }
+        }
 
         private func subAddStartTimer(isLeft: Bool) {
             if isLeft {
-                givenHealthTotal -= 10
+                changeHealth(-10)
                 leftHoldTimer = Timer.scheduledTimer(
                     withTimeInterval: 0.5,
                     repeats: true
                 ) { _ in
-                    givenHealthTotal -= 10
+                    changeHealth(-10)
                 }
             } else {
-                givenHealthTotal += 10
+                changeHealth(10)
                 rightHoldTimer = Timer.scheduledTimer(
                     withTimeInterval: 0.5,
                     repeats: true
                 ) { _ in
-                    givenHealthTotal += 10
+                    changeHealth(10)
                 }
             }
         }
@@ -71,9 +87,9 @@ struct UserHealthView: View {
                     .contentShape(Rectangle())
                     .onTapGesture {
                         if flipLeftRight {
-                            givenHealthTotal += 1
+                            changeHealth(1)
                         } else {
-                            givenHealthTotal -= 1
+                            changeHealth(-1)
                         }
                     }
                     .gesture(
@@ -100,9 +116,9 @@ struct UserHealthView: View {
                     .contentShape(Rectangle())
                     .onTapGesture {
                         if flipLeftRight {
-                            givenHealthTotal -= 1
+                            changeHealth(-1)
                         } else {
-                            givenHealthTotal += 1
+                            changeHealth(1)
                         }
                     }
                     .gesture(
@@ -130,11 +146,10 @@ struct UserHealthView: View {
     var body: some View {
         GeometryReader { geo in
             ZStack {
-
                 RoundedRectangle(cornerRadius: 15)
                     .fill(healthColor)
 
-                Text("\(healthTotal)")
+                Text("\(player.currentLife)")
                     .foregroundStyle(.white)
                     .rotationEffect(Angle(degrees: lifeOrientation.rawValue))
                     .font(.system(size: geo.size.width * 0.3))
@@ -143,16 +158,42 @@ struct UserHealthView: View {
                 if lifeOrientation == .Left || lifeOrientation == .Right {
                     VStack(spacing: 0) {
                         HealthButtons(
-                            givenHealthTotal: $healthTotal,
-                            givenLifeOrientation: $lifeOrientation
+                            player: player,
+                            givenLifeOrientation: lifeOrientation
                         )
+                        .environment(conclave)
                     }
                 } else {
                     HStack(spacing: 0) {
                         HealthButtons(
-                            givenHealthTotal: $healthTotal,
-                            givenLifeOrientation: $lifeOrientation
+                            player: player,
+                            givenLifeOrientation: lifeOrientation
                         )
+                        .environment(conclave)
+                    }
+                }
+                let healthText = Text("\(player.clerkUserId)")
+                    .rotationEffect(Angle(degrees: lifeOrientation.rawValue))
+                switch lifeOrientation {
+                case .Up:
+                    VStack {
+                        healthText
+                        Spacer()
+                    }
+                case .Left:
+                    HStack {
+                        Spacer()
+                        healthText
+                    }
+                case .Right:
+                    HStack {
+                        healthText
+                        Spacer()
+                    }
+                case .Down:
+                    VStack {
+                        Spacer()
+                        healthText
                     }
                 }
             }
@@ -162,14 +203,34 @@ struct UserHealthView: View {
 }
 
 #Preview {
-    VStack {
+    @Previewable @State var mockManager: ConclaveClientManager =
+        ConclaveClientManager(client: MockConclaveClient.testing)
+    if mockManager.isConnectedToWebSocket {
         HStack {
-            UserHealthView(.red, lifeOrientation: .Up)
+            UserHealthView(
+                mockManager.allPlayers[0],
+                .red,
+                lifeOrientation: .Left
+            )
+            .environment(mockManager)
         }
-        HStack {
-            UserHealthView(.yellow, lifeOrientation: .Left)
-            UserHealthView(.blue, lifeOrientation: .Right)
-        }
+    } else {
+        ProgressView()
+            .progressViewStyle(.circular)
+            .task {
+                do {
+                    let game = try await mockManager.createGame(
+                        name: "MyGame",
+                        clerkUserId: "MyUser"
+                    )
+                    try await mockManager
+                        .connectToWebSocket(
+                            gameId: game.id,
+                            clerkUserId: "MyUser"
+                        )
+                } catch {
+                    print("Failed to create game: \(error)")
+                }
+            }
     }
-    .padding()
 }

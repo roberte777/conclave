@@ -374,6 +374,58 @@ pub async fn get_user_games(pool: &SqlitePool, clerk_user_id: &str) -> Result<Ve
     Ok(games)
 }
 
+pub async fn get_all_games(pool: &SqlitePool) -> Result<Vec<GameWithUsers>> {
+    let rows = sqlx::query(
+        r#"
+        SELECT DISTINCT g.*
+        FROM games g
+        INNER JOIN players p ON g.id = p.game_id
+        WHERE g.status != 'finished'
+        ORDER BY g.created_at DESC
+        "#,
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let mut games = Vec::new();
+    for row in rows {
+        let game_id = Uuid::parse_str(&row.get::<String, _>("id")).unwrap();
+        let game = Game {
+            id: game_id,
+            name: row.get("name"),
+            status: row.get("status"),
+            starting_life: row.get("starting_life"),
+            created_at: chrono::DateTime::parse_from_rfc3339(&row.get::<String, _>("created_at"))
+                .unwrap()
+                .with_timezone(&Utc),
+            finished_at: row.get::<Option<String>, _>("finished_at").map(|s| {
+                chrono::DateTime::parse_from_rfc3339(&s)
+                    .unwrap()
+                    .with_timezone(&Utc)
+            }),
+        };
+
+        // Get users in this game
+        let player_rows = sqlx::query(
+            "SELECT DISTINCT clerk_user_id FROM players WHERE game_id = ? ORDER BY position",
+        )
+        .bind(game_id.to_string())
+        .fetch_all(pool)
+        .await?;
+
+        let users = player_rows
+            .into_iter()
+            .map(|row| UserInfo {
+                clerk_user_id: row.get("clerk_user_id"),
+            })
+            .collect::<Vec<UserInfo>>();
+
+        games.push(GameWithUsers { game, users });
+    }
+
+    Ok(games)
+}
+
 pub async fn update_player_life(
     pool: &SqlitePool,
     player_id: Uuid,

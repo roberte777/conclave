@@ -17,7 +17,7 @@ public struct ConclaveConfiguration: Sendable {
             case .staging:
                 return "http://localhost:3001"
             case .production:
-                return "http://localhost:3001"
+                return "https://conclave-api.fly.dev"
             case .custom(let baseURL):
                 return baseURL
             }

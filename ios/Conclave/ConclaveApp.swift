@@ -7,6 +7,7 @@ struct ConclaveApp: App {
 
     init() {
         do {
+            AppEnvironment.setupConfiguration()
             conclave = try ConclaveClientManager(
                 baseURL: AppEnvironment.baseURL
             )

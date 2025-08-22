@@ -67,6 +67,7 @@ async fn main() -> anyhow::Result<()> {
         )
         // Game endpoints
         .route("/games", post(handlers::create_game))
+        .route("/games", get(handlers::get_all_games))
         .route("/games/{game_id}", get(handlers::get_game))
         .route("/games/{game_id}/state", get(handlers::get_game_state))
         .route("/games/{game_id}/join", post(handlers::join_game))

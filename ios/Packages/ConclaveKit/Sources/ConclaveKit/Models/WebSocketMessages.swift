@@ -30,8 +30,18 @@ public enum ClientMessage: Codable, Sendable {
     case leaveGame(playerId: UUID)
     case getGameState
     case endGame
-    case setCommanderDamage(fromPlayerId: UUID, toPlayerId: UUID, commanderNumber: Int32, newDamage: Int32)
-    case updateCommanderDamage(fromPlayerId: UUID, toPlayerId: UUID, commanderNumber: Int32, damageAmount: Int32)
+    case setCommanderDamage(
+        fromPlayerId: UUID,
+        toPlayerId: UUID,
+        commanderNumber: Int32,
+        newDamage: Int32
+    )
+    case updateCommanderDamage(
+        fromPlayerId: UUID,
+        toPlayerId: UUID,
+        commanderNumber: Int32,
+        damageAmount: Int32
+    )
     case togglePartner(playerId: UUID, enablePartner: Bool)
 
     private enum CodingKeys: String, CodingKey {
@@ -73,21 +83,58 @@ public enum ClientMessage: Codable, Sendable {
         case "endGame":
             self = .endGame
         case "setCommanderDamage":
-            let fromPlayerId = try container.decode(UUID.self, forKey: .fromPlayerId)
-            let toPlayerId = try container.decode(UUID.self, forKey: .toPlayerId)
-            let commanderNumber = try container.decode(Int32.self, forKey: .commanderNumber)
+            let fromPlayerId = try container.decode(
+                UUID.self,
+                forKey: .fromPlayerId
+            )
+            let toPlayerId = try container.decode(
+                UUID.self,
+                forKey: .toPlayerId
+            )
+            let commanderNumber = try container.decode(
+                Int32.self,
+                forKey: .commanderNumber
+            )
             let newDamage = try container.decode(Int32.self, forKey: .newDamage)
-            self = .setCommanderDamage(fromPlayerId: fromPlayerId, toPlayerId: toPlayerId, commanderNumber: commanderNumber, newDamage: newDamage)
+            self = .setCommanderDamage(
+                fromPlayerId: fromPlayerId,
+                toPlayerId: toPlayerId,
+                commanderNumber: commanderNumber,
+                newDamage: newDamage
+            )
         case "updateCommanderDamage":
-            let fromPlayerId = try container.decode(UUID.self, forKey: .fromPlayerId)
-            let toPlayerId = try container.decode(UUID.self, forKey: .toPlayerId)
-            let commanderNumber = try container.decode(Int32.self, forKey: .commanderNumber)
-            let damageAmount = try container.decode(Int32.self, forKey: .damageAmount)
-            self = .updateCommanderDamage(fromPlayerId: fromPlayerId, toPlayerId: toPlayerId, commanderNumber: commanderNumber, damageAmount: damageAmount)
+            let fromPlayerId = try container.decode(
+                UUID.self,
+                forKey: .fromPlayerId
+            )
+            let toPlayerId = try container.decode(
+                UUID.self,
+                forKey: .toPlayerId
+            )
+            let commanderNumber = try container.decode(
+                Int32.self,
+                forKey: .commanderNumber
+            )
+            let damageAmount = try container.decode(
+                Int32.self,
+                forKey: .damageAmount
+            )
+            self = .updateCommanderDamage(
+                fromPlayerId: fromPlayerId,
+                toPlayerId: toPlayerId,
+                commanderNumber: commanderNumber,
+                damageAmount: damageAmount
+            )
         case "togglePartner":
             let playerId = try container.decode(UUID.self, forKey: .playerId)
-            let enablePartner = try container.decode(Bool.self, forKey: .enablePartner)
-            self = .togglePartner(playerId: playerId, enablePartner: enablePartner)
+            let enablePartner = try container.decode(
+                Bool.self,
+                forKey: .enablePartner
+            )
+            self = .togglePartner(
+                playerId: playerId,
+                enablePartner: enablePartner
+            )
         default:
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
@@ -116,13 +163,23 @@ public enum ClientMessage: Codable, Sendable {
             try container.encode("getGameState", forKey: .action)
         case .endGame:
             try container.encode("endGame", forKey: .action)
-        case .setCommanderDamage(let fromPlayerId, let toPlayerId, let commanderNumber, let newDamage):
+        case .setCommanderDamage(
+            let fromPlayerId,
+            let toPlayerId,
+            let commanderNumber,
+            let newDamage
+        ):
             try container.encode("setCommanderDamage", forKey: .action)
             try container.encode(fromPlayerId, forKey: .fromPlayerId)
             try container.encode(toPlayerId, forKey: .toPlayerId)
             try container.encode(commanderNumber, forKey: .commanderNumber)
             try container.encode(newDamage, forKey: .newDamage)
-        case .updateCommanderDamage(let fromPlayerId, let toPlayerId, let commanderNumber, let damageAmount):
+        case .updateCommanderDamage(
+            let fromPlayerId,
+            let toPlayerId,
+            let commanderNumber,
+            let damageAmount
+        ):
             try container.encode("updateCommanderDamage", forKey: .action)
             try container.encode(fromPlayerId, forKey: .fromPlayerId)
             try container.encode(toPlayerId, forKey: .toPlayerId)
@@ -166,7 +223,9 @@ public enum ServerMessage: Codable, Sendable {
         case "gameEnded":
             self = .gameEnded(try GameEndedMessage(from: decoder))
         case "commanderDamageUpdate":
-            self = .commanderDamageUpdate(try CommanderDamageUpdateMessage(from: decoder))
+            self = .commanderDamageUpdate(
+                try CommanderDamageUpdateMessage(from: decoder)
+            )
         case "partnerToggled":
             self = .partnerToggled(try PartnerToggledMessage(from: decoder))
         case "error":
@@ -250,15 +309,27 @@ public struct PlayerLeftMessage: Codable, Sendable {
 
 public struct GameStartedMessage: Codable, Sendable {
     public let type: String
-    public let gameId: UUID
+    public let game: Game
     public let players: [Player]
-    public let commanderDamage: [CommanderDamage]?
+    public let recentChanges: [LifeChange]
+    public let commanderDamage: [CommanderDamage]
 
-    public init(gameId: UUID, players: [Player], commanderDamage: [CommanderDamage]? = nil) {
+    public init(
+        game: Game,
+        players: [Player],
+        recentChanges: [LifeChange],
+        commanderDamage: [CommanderDamage]
+    ) {
         self.type = "gameStarted"
-        self.gameId = gameId
+        self.game = game
         self.players = players
+        self.recentChanges = recentChanges
         self.commanderDamage = commanderDamage
+    }
+
+    // Helper property to get gameId from nested game object
+    public var gameId: UUID {
+        return game.id
     }
 }
 

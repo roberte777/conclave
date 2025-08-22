@@ -39,7 +39,9 @@ public struct GameWithPlayers: Codable, Equatable, Sendable {
     }
 }
 
-public struct GameWithUsers: Codable, Equatable, Sendable {
+public struct GameWithUsers: Identifiable, Codable, Equatable, Sendable {
+    public typealias ID = Game.ID
+    public var id: ID { game.id }
     public let game: Game
     public let users: [UserInfo]
 

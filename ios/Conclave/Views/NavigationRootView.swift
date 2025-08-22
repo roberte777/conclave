@@ -14,8 +14,15 @@ struct NavigationRootView: View {
                             .navigationBarBackButtonHidden()
                     case .userSettings:
                         UserSettingsView()
-                    case .login:
-                        EmptyView()
+                    case .gameList:
+                        GameListView(screenPath: $screenPath)
+                            .environment(conclave)
+                    case .onlineGame:
+                        OnlineGameView(screenPath: $screenPath)
+                            .navigationBarBackButtonHidden()
+                    case .gameSettings:
+                        GameSettingsView(screenPath: $screenPath)
+                            .environment(conclave)
                     }
                 }
         }
