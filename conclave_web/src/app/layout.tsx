@@ -48,12 +48,12 @@ export default function RootLayout({
             </div>
             <div className="flex items-center gap-4">
               <SignedOut>
-                <SignInButton>
+                <SignInButton mode="modal">
                   <button className="text-sm font-medium hover:text-primary transition-colors">
                     Sign In
                   </button>
                 </SignInButton>
-                <SignUpButton>
+                <SignUpButton mode="modal">
                   <button className="bg-primary text-primary-foreground rounded-md font-medium text-sm h-9 px-4 hover:bg-primary/90 transition-colors">
                     Get Started
                   </button>

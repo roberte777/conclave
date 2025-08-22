@@ -1,3 +1,5 @@
+"use client";
+
 import { SignedIn, SignedOut } from "@clerk/nextjs";
 import { LandingPage } from "@/components/landing-page";
 import { UserDashboard } from "@/components/user-dashboard";
