@@ -8,6 +8,7 @@ import {
   UserButton,
 } from "@clerk/nextjs";
 import { Geist, Geist_Mono } from "next/font/google";
+import Link from "next/link";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -32,6 +33,7 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+
   return (
     <ClerkProvider>
       <html lang="en">
@@ -40,9 +42,9 @@ export default function RootLayout({
         >
           <header className="flex justify-between items-center p-4 border-b h-16">
             <div className="flex items-center gap-2">
-              <a href="/" className="text-xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+              <Link href="/" className="text-xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
                 Conclave
-              </a>
+              </Link>
             </div>
             <div className="flex items-center gap-4">
               <SignedOut>
