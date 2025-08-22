@@ -9,8 +9,6 @@ import {
 } from "@clerk/nextjs";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { QueryProvider } from "@/components/providers/query-provider";
-import { Toaster } from "@/components/ui/sonner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -20,12 +18,13 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  // Avoid preloading monospace font since it's rarely used globally
+  preload: false,
 });
 
 export const metadata: Metadata = {
   title: "Conclave - MTG Life Tracker",
-  description: "Track life totals and manage games for Magic: The Gathering multiplayer sessions",
-  keywords: ["MTG", "Magic The Gathering", "life tracker", "multiplayer", "game tracker"],
+  description: "Real-time multiplayer life tracker for Magic: The Gathering",
 };
 
 export default function RootLayout({
@@ -37,45 +36,40 @@ export default function RootLayout({
     <ClerkProvider>
       <html lang="en">
         <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
+          className={`${geistSans.variable} ${geistMono.variable} antialiased font-sans`}
         >
-          <QueryProvider>
-            <header className="border-b border-border bg-card">
-              <div className="container mx-auto flex justify-between items-center p-4 h-16">
-                <div className="flex items-center gap-2">
-                  <h1 className="text-xl font-bold text-primary">⚔️ Conclave</h1>
-                  <span className="text-sm text-muted-foreground">MTG Life Tracker</span>
-                </div>
-                <div className="flex items-center gap-4">
-                  <SignedOut>
-                    <SignInButton mode="modal">
-                      <button className="text-sm hover:text-primary transition-colors">
-                        Sign In
-                      </button>
-                    </SignInButton>
-                    <SignUpButton mode="modal">
-                      <button className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-md font-medium text-sm h-9 px-3 transition-colors">
-                        Sign Up
-                      </button>
-                    </SignUpButton>
-                  </SignedOut>
-                  <SignedIn>
-                    <UserButton
-                      appearance={{
-                        elements: {
-                          avatarBox: "h-8 w-8",
-                        },
-                      }}
-                    />
-                  </SignedIn>
-                </div>
-              </div>
-            </header>
-            <main className="min-h-[calc(100vh-4rem)]">
-              {children}
-            </main>
-            <Toaster />
-          </QueryProvider>
+          <header className="flex justify-between items-center p-4 border-b h-16">
+            <div className="flex items-center gap-2">
+              <a href="/" className="text-xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+                Conclave
+              </a>
+            </div>
+            <div className="flex items-center gap-4">
+              <SignedOut>
+                <SignInButton mode="modal">
+                  <button className="text-sm font-medium hover:text-primary transition-colors">
+                    Sign In
+                  </button>
+                </SignInButton>
+                <SignUpButton mode="modal">
+                  <button className="bg-primary text-primary-foreground rounded-md font-medium text-sm h-9 px-4 hover:bg-primary/90 transition-colors">
+                    Get Started
+                  </button>
+                </SignUpButton>
+              </SignedOut>
+              <SignedIn>
+                <UserButton
+                  afterSignOutUrl="/"
+                  appearance={{
+                    elements: {
+                      avatarBox: "h-8 w-8"
+                    }
+                  }}
+                />
+              </SignedIn>
+            </div>
+          </header>
+          {children}
         </body>
       </html>
     </ClerkProvider>
