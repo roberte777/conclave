@@ -25,32 +25,7 @@ import { ConclaveAPI, type GameWithUsers, DEFAULT_STARTING_LIFE } from "@/lib/ap
 import { useMemo } from "react";
 
 export function UserDashboard() {
-  const { isLoaded, user } = useUser();
-  
-  // Show loading while user data is being fetched
-  if (!isLoaded) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Loading dashboard...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-  
-  // If loaded but no user, this shouldn't happen due to middleware, but handle gracefully
-  if (!user) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="text-center">
-          <p className="text-muted-foreground">Please sign in to access your dashboard.</p>
-        </div>
-      </div>
-    );
-  }
+  const { user } = useUser();
   const [creatingGame, setCreatingGame] = useState(false);
   const [myActiveGames, setMyActiveGames] = useState<GameWithUsers[]>([]);
   const [availableGames, setAvailableGames] = useState<GameWithUsers[]>([]);
