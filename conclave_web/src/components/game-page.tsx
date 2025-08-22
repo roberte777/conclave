@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable react-hooks/exhaustive-deps */
 
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";

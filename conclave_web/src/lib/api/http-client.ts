@@ -3,7 +3,6 @@ import type {
   GameState,
   GameHistory,
   GameWithUsers,
-  GameEndResult,
   LifeChange,
   CommanderDamage,
   CreateGameRequest,
