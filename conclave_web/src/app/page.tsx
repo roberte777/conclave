@@ -1,13 +1,18 @@
-import { auth } from "@clerk/nextjs/server";
+"use client";
+
+import { SignedIn, SignedOut } from "@clerk/nextjs";
 import { LandingPage } from "@/components/landing-page";
 import { UserDashboard } from "@/components/user-dashboard";
 
-export default async function Home() {
-  const { userId } = await auth();
-
-  if (!userId) {
-    return <LandingPage />;
-  }
-
-  return <UserDashboard />;
+export default function Home() {
+  return (
+    <>
+      <SignedOut>
+        <LandingPage />
+      </SignedOut>
+      <SignedIn>
+        <UserDashboard />
+      </SignedIn>
+    </>
+  );
 }
