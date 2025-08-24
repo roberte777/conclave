@@ -31,6 +31,9 @@ export function Header() {
           </SignUpButton>
         </SignedOut>
         <SignedIn>
+          <Link href="/history" className="text-sm font-medium hover:text-primary transition-colors">
+            History
+          </Link>
           <UserButton
             afterSignOutUrl="/"
             appearance={{
