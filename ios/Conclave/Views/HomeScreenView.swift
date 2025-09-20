@@ -1,7 +1,10 @@
+import Clerk
 import SwiftUI
 
 struct HomeScreenView: View {
+    @Environment(\.clerk) private var clerk
     @Binding var screenPath: NavigationPath
+    @State private var authIsPresented = false
 
     var body: some View {
         ZStack {
@@ -14,21 +17,23 @@ struct HomeScreenView: View {
             }
 
             VStack {
-                HStack {
-                    Spacer()
-                    Button(action: {
-                        print("path before \(screenPath)")
-                        screenPath.append(Screen.userSettings)
-                        print("path after\(screenPath)")
-                    }) {
-                        Image(systemName: "person.circle")
-                            .resizable()
-                            .frame(width: 30, height: 30)
-                            .foregroundColor(.primary)
-                            .padding()
+                Spacer()
+                if clerk.user != nil {
+                    UserButton()
+                        .frame(width: 36, height: 36)
+                } else {
+                    HStack {
+                        Button(action: {
+                            authIsPresented = true
+                        }) {
+                            Image(systemName: "person.circle")
+                                .resizable()
+                                .frame(width: 30, height: 30)
+                                .foregroundColor(.primary)
+                                .padding()
+                        }
                     }
                 }
-                Spacer()
             }
 
             VStack {
@@ -36,7 +41,11 @@ struct HomeScreenView: View {
                     .font(.title)
                     .foregroundStyle(.primary)
                     .onTapGesture {
-                        screenPath.append(Screen.gameList)
+                        if clerk.user != nil {
+                            screenPath.append(Screen.gameList)
+                        } else {
+                            authIsPresented = true
+                        }
                     }
                     .padding(10)
                 Text("Offline Game")
@@ -46,6 +55,9 @@ struct HomeScreenView: View {
                         screenPath.append(Screen.offlineGame)
                     }
             }
+        }
+        .sheet(isPresented: $authIsPresented) {
+            AuthView()
         }
     }
 }

@@ -1,17 +1,15 @@
+import Clerk
 import ConclaveKit
 import SwiftUI
 
 struct GameListView: View {
     @Binding var screenPath: NavigationPath
     @Environment(ConclaveClientManager.self) private var conclave
-
+    @Environment(\.clerk) private var clerk
     @State private var showCreateAlert = false
-    @State private var showJoinAlert = false
     @State private var newGameName = ""
-    @State private var newUserName = ""
 
     var body: some View {
-
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Button(action: {
@@ -24,21 +22,24 @@ struct GameListView: View {
                     isPresented: $showCreateAlert,
                     actions: {
                         TextField("Game Name", text: $newGameName)
-                        TextField("User Name", text: $newUserName)
                         Button("Create") {
-                            Task {
-                                await addGame(
-                                    gameName: newGameName,
-                                    userName: newUserName
+                            if let user = clerk.user {
+                                Task {
+                                    await addGame(
+                                        gameName: newGameName,
+                                        clerkUserId: user.id
+                                    )
+                                    newGameName = ""
+                                }
+                            } else {
+                                // Not logged in, show error
+                                print(
+                                    "You must be logged in to create a game."
                                 )
-                                newGameName = ""
-                                newUserName = ""
-
                             }
                         }
                         Button("Cancel", role: .cancel) {
                             newGameName = ""
-                            newUserName = ""
                         }
                     },
                     message: {
@@ -68,7 +69,18 @@ struct GameListView: View {
                 .bold()
             ForEach(conclave.allGames) { item in
                 Button(action: {
-                    showJoinAlert = true
+                    if let user = clerk.user {
+                        Task {
+                            await joinGame(
+                                gameId: item.game.id,
+                                clerkUserId: user.id
+                            )
+                        }
+                    } else {
+                        print(
+                            "You must be logged in to join a game."
+                        )
+                    }
                 }) {
                     Text(item.game.name)
                         .padding()
@@ -76,28 +88,6 @@ struct GameListView: View {
                         .background(Color.blue.opacity(0.1))
                         .cornerRadius(8)
                 }
-                .alert(
-                    "Join Game",
-                    isPresented: $showJoinAlert,
-                    actions: {
-                        TextField("User Name", text: $newUserName)
-                        Button("Submit") {
-                            Task {
-                                await joinGame(
-                                    gameId: item.game.id,
-                                    userName: newUserName
-                                )
-                                newUserName = ""
-                            }
-                        }
-                        Button("Cancel", role: .cancel) {
-                            newUserName = ""
-                        }
-                    },
-                    message: {
-                        Text("Enter your name")
-                    }
-                )
             }
 
         }
@@ -105,16 +95,16 @@ struct GameListView: View {
         Spacer()
     }
 
-    private func addGame(gameName: String, userName: String) async {
+    private func addGame(gameName: String, clerkUserId: String) async {
         do {
             let game = try await conclave.createGame(
                 name: gameName,
-                clerkUserId: userName
+                clerkUserId: clerkUserId
             )
             try await conclave
                 .connectToWebSocket(
                     gameId: game.id,
-                    clerkUserId: userName
+                    clerkUserId: clerkUserId
                 )
             screenPath.append(Screen.onlineGame)
         } catch {
@@ -122,19 +112,23 @@ struct GameListView: View {
         }
     }
 
-    private func joinGame(gameId: UUID, userName: String) async {
+    private func joinGame(gameId: UUID, clerkUserId: String) async {
         do {
             try await conclave
                 .connectToWebSocket(
                     gameId: gameId,
-                    clerkUserId: userName
+                    clerkUserId: clerkUserId
                 )
             let game = try await conclave.loadGame(gameId: gameId)
             print("HELLO! \(game.name)")
-            let _ = try await conclave.joinGame(
-                gameId: game.id,
-                clerkUserId: userName
-            )
+            do {
+                let _ = try await conclave.joinGame(
+                    gameId: game.id,
+                    clerkUserId: clerkUserId
+                )
+            } catch {
+                print("Joining an existing game: \(error)")
+            }
             screenPath.append(Screen.onlineGame)
         } catch {
             print("Failed to join game: \(error)")

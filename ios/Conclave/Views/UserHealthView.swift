@@ -1,4 +1,5 @@
 import ConclaveKit
+import Clerk
 import SwiftUI
 
 enum LifeOrientation: Double {
@@ -13,6 +14,7 @@ struct UserHealthView: View {
     var lifeOrientation: LifeOrientation
     var player: Player
     @Environment(ConclaveClientManager.self) private var conclave
+    @Environment(\.clerk) private var clerk
 
     init(
         _ player: Player,
@@ -172,7 +174,7 @@ struct UserHealthView: View {
                         .environment(conclave)
                     }
                 }
-                let healthText = Text("\(player.clerkUserId)")
+                let healthText = Text("\(clerk.user?.username ?? "Unknown User")")
                     .rotationEffect(Angle(degrees: lifeOrientation.rawValue))
                 switch lifeOrientation {
                 case .Up:

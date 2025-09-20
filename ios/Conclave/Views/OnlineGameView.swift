@@ -28,7 +28,7 @@ struct OnlineGameView: View {
                     Button(action: {
                         screenPath.append(Screen.gameSettings)
                     }) {
-                        Image(systemName: "xmark")
+                        Image(systemName: "gear")
                             .foregroundColor(.primary)
                             .fontWeight(.bold)
                             .padding(10)
