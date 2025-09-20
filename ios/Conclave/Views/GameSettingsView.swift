@@ -4,6 +4,7 @@ import SwiftUI
 struct GameSettingsView: View {
     @Binding var screenPath: NavigationPath
     @Environment(ConclaveClientManager.self) private var conclave
+    @Environment(\.clerk) private var clerk
 
     var body: some View {
         if let currentGame = conclave.currentGame {
@@ -56,7 +57,7 @@ struct GameSettingsView: View {
         guard let currentGame = conclave.currentGame else {
             return
         }
-        guard conclave.currentPlayer != nil else {
+        guard clerk.user != nil else {
             return
         }
 
@@ -64,7 +65,7 @@ struct GameSettingsView: View {
             do {
                 try await conclave.leaveGame(
                     gameId: currentGame.id,
-                    clerkUserId: conclave.currentPlayer!.clerkUserId
+                    clerkUserId: clerk.user!.id
                 )
 
                 conclave.clearCurrentGame()
