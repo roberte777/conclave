@@ -82,7 +82,7 @@ public final class WebSocketClient: ConclaveWebSocketClient, Sendable {
 
         // Connection info for reconnection
         private var _gameId: UUID?
-        private var _clerkUserId: String?
+        private var _token: String?
 
         // Reconnection management with exponential backoff
         private var _reconnectAttempts = 0
@@ -110,24 +110,24 @@ public final class WebSocketClient: ConclaveWebSocketClient, Sendable {
             return _webSocketTask
         }
 
-        func setConnectionInfo(gameId: UUID, clerkUserId: String) {
+        func setConnectionInfo(gameId: UUID, token: String) {
             _gameId = gameId
-            _clerkUserId = clerkUserId
+            _token = token
         }
 
-        func getConnectionInfo() -> (gameId: UUID, clerkUserId: String)? {
-            guard let gameId = _gameId, let clerkUserId = _clerkUserId else {
+        func getConnectionInfo() -> (gameId: UUID, token: String)? {
+            guard let gameId = _gameId, let token = _token else {
                 ConclaveLogger.shared.debug(
-                    "getConnectionInfo returning nil - gameId: \(_gameId?.uuidString ?? "nil"), clerkUserId: \(_clerkUserId ?? "nil")",
+                    "getConnectionInfo returning nil - gameId: \(_gameId?.uuidString ?? "nil"), token: \(_token != nil ? "[set]" : "nil")",
                     category: .websocket
                 )
                 return nil
             }
             ConclaveLogger.shared.debug(
-                "getConnectionInfo returning - gameId: \(gameId.uuidString), clerkUserId: \(clerkUserId)",
+                "getConnectionInfo returning - gameId: \(gameId.uuidString), token: [set]",
                 category: .websocket
             )
-            return (gameId, clerkUserId)
+            return (gameId, token)
         }
 
         func shouldReconnect() -> Bool {
@@ -164,7 +164,7 @@ public final class WebSocketClient: ConclaveWebSocketClient, Sendable {
             )
             disconnect()
             _gameId = nil
-            _clerkUserId = nil
+            _token = nil
             _reconnectAttempts = 0
         }
 
@@ -277,7 +277,7 @@ public final class WebSocketClient: ConclaveWebSocketClient, Sendable {
 
     // MARK: - Connection Management
 
-    public func connect(gameId: UUID, clerkUserId: String) async throws {
+    public func connect(gameId: UUID, token: String) async throws {
         guard !(await connectionManager.isConnected()) else {
             ConclaveLogger.shared.debug(
                 "WebSocket already connected",
@@ -289,11 +289,11 @@ public final class WebSocketClient: ConclaveWebSocketClient, Sendable {
         ConclaveLogger.shared.logWebSocketEvent(
             "Connecting",
             gameId: gameId,
-            details: "User: \(clerkUserId)"
+            details: "With JWT token"
         )
         await connectionManager.setConnectionInfo(
             gameId: gameId,
-            clerkUserId: clerkUserId
+            token: token
         )
 
         // Create a fresh message stream for this connection
@@ -320,8 +320,8 @@ public final class WebSocketClient: ConclaveWebSocketClient, Sendable {
                 value: connectionInfo.gameId.uuidString
             ),
             URLQueryItem(
-                name: "clerkUserId",
-                value: connectionInfo.clerkUserId
+                name: "token",
+                value: connectionInfo.token
             ),
         ]
 
@@ -388,11 +388,6 @@ public final class WebSocketClient: ConclaveWebSocketClient, Sendable {
             playerId: playerId,
             changeAmount: changeAmount
         )
-        try await sendMessage(message)
-    }
-
-    public func joinGame(clerkUserId: String) async throws {
-        let message = ClientMessage.joinGame(clerkUserId: clerkUserId)
         try await sendMessage(message)
     }
 

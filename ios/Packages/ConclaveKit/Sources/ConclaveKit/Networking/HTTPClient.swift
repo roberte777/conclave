@@ -3,6 +3,7 @@ import Foundation
 /// High-performance HTTP client with automatic error handling and request optimization
 ///
 /// Features:
+/// - JWT token-based authentication
 /// - Automatic JSON encoding/decoding with camelCase format
 /// - Enhanced error mapping with recovery information
 /// - Request caching and deduplication for GET requests
@@ -16,6 +17,21 @@ public final class HTTPClient: ConclaveAPIClient, Sendable {
     private let session: URLSession
     private let decoder: JSONDecoder
     private let encoder: JSONEncoder
+
+    /// Actor to manage auth token state safely
+    private actor TokenManager {
+        private var _authToken: String?
+
+        func setToken(_ token: String?) {
+            _authToken = token
+        }
+
+        func getToken() -> String? {
+            return _authToken
+        }
+    }
+
+    private let tokenManager = TokenManager()
 
     public init(baseURL: URL, session: URLSession = .shared) {
         self.baseURL = baseURL
@@ -72,6 +88,12 @@ public final class HTTPClient: ConclaveAPIClient, Sendable {
         self.init(baseURL: url, session: session)
     }
 
+    // MARK: - Authentication
+
+    public func setAuthToken(_ token: String?) async {
+        await tokenManager.setToken(token)
+    }
+
     // MARK: - Health & Stats
 
     public func health() async throws -> HealthResponse {
@@ -82,38 +104,34 @@ public final class HTTPClient: ConclaveAPIClient, Sendable {
         try await performRequest(path: "/stats", method: .GET)
     }
 
-    // MARK: - User Endpoints
+    // MARK: - User Endpoints (authenticated)
 
-    public func getUserHistory(clerkUserId: String) async throws -> GameHistory
-    {
+    public func getUserHistory() async throws -> GameHistory {
         try await performRequest(
-            path: "/users/\(clerkUserId)/history",
-            method: .GET
+            path: "/users/me/history",
+            method: .GET,
+            requiresAuth: true
         )
     }
 
-    public func getUserGames(clerkUserId: String) async throws
-        -> [GameWithUsers]
-    {
+    public func getUserGames() async throws -> [GameWithUsers] {
         try await performRequest(
-            path: "/users/\(clerkUserId)/games",
-            method: .GET
+            path: "/users/me/games",
+            method: .GET,
+            requiresAuth: true
         )
     }
 
-    public func getAvailableGames(clerkUserId: String) async throws
-        -> [GameWithUsers]
-    {
+    public func getAvailableGames() async throws -> [GameWithUsers] {
         try await performRequest(
-            path: "/users/\(clerkUserId)/available-games",
-            method: .GET
+            path: "/users/me/available-games",
+            method: .GET,
+            requiresAuth: true
         )
     }
 
     // NOTE: Development testing
-    public func getAllGames() async throws
-        -> [GameWithUsers]
-    {
+    public func getAllGames() async throws -> [GameWithUsers] {
         try await performRequest(
             path: "/games",
             method: .GET
@@ -123,7 +141,12 @@ public final class HTTPClient: ConclaveAPIClient, Sendable {
     // MARK: - Game Endpoints
 
     public func createGame(request: CreateGameRequest) async throws -> Game {
-        try await performRequest(path: "/games", method: .POST, body: request)
+        try await performRequest(
+            path: "/games",
+            method: .POST,
+            body: request,
+            requiresAuth: true
+        )
     }
 
     public func getGame(gameId: UUID) async throws -> Game {
@@ -140,21 +163,19 @@ public final class HTTPClient: ConclaveAPIClient, Sendable {
         )
     }
 
-    public func joinGame(gameId: UUID, request: JoinGameRequest) async throws
-        -> Player
-    {
+    public func joinGame(gameId: UUID) async throws -> Player {
         try await performRequest(
             path: "/games/\(gameId.uuidString)/join",
             method: .POST,
-            body: request
+            requiresAuth: true
         )
     }
 
-    public func leaveGame(gameId: UUID, request: JoinGameRequest) async throws {
+    public func leaveGame(gameId: UUID) async throws {
         let _: EmptyResponse = try await performRequest(
             path: "/games/\(gameId.uuidString)/leave",
             method: .POST,
-            body: request
+            requiresAuth: true
         )
     }
 
@@ -171,7 +192,8 @@ public final class HTTPClient: ConclaveAPIClient, Sendable {
     public func endGame(gameId: UUID) async throws -> Game {
         try await performRequest(
             path: "/games/\(gameId.uuidString)/end",
-            method: .PUT
+            method: .PUT,
+            requiresAuth: true
         )
     }
 
@@ -214,13 +236,22 @@ public final class HTTPClient: ConclaveAPIClient, Sendable {
     private func performRequest<T: Codable>(
         path: String,
         method: HTTPMethod,
-        body: (any Encodable)? = nil
+        body: (any Encodable)? = nil,
+        requiresAuth: Bool = false
     ) async throws -> T {
         let url = baseURL.appendingPathComponent(path)
         var request = URLRequest(url: url)
         request.httpMethod = method.rawValue
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        // Add authorization header if required
+        if requiresAuth {
+            guard let token = await tokenManager.getToken() else {
+                throw ConclaveError.authenticationFailed("No auth token set")
+            }
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
 
         // Log the request
         ConclaveLogger.shared.logHTTPRequest(

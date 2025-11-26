@@ -3,7 +3,6 @@ import Foundation
 public enum WebSocketMessage {
     public enum ClientAction: String, CaseIterable {
         case updateLife = "updateLife"
-        case joinGame = "joinGame"
         case leaveGame = "leaveGame"
         case getGameState = "getGameState"
         case endGame = "endGame"
@@ -26,7 +25,6 @@ public enum WebSocketMessage {
 
 public enum ClientMessage: Codable, Sendable {
     case updateLife(playerId: UUID, changeAmount: Int32)
-    case joinGame(clerkUserId: String)
     case leaveGame(playerId: UUID)
     case getGameState
     case endGame
@@ -48,7 +46,6 @@ public enum ClientMessage: Codable, Sendable {
         case action
         case playerId
         case changeAmount
-        case clerkUserId
         case fromPlayerId
         case toPlayerId
         case commanderNumber
@@ -69,12 +66,6 @@ public enum ClientMessage: Codable, Sendable {
                 forKey: .changeAmount
             )
             self = .updateLife(playerId: playerId, changeAmount: changeAmount)
-        case "joinGame":
-            let clerkUserId = try container.decode(
-                String.self,
-                forKey: .clerkUserId
-            )
-            self = .joinGame(clerkUserId: clerkUserId)
         case "leaveGame":
             let playerId = try container.decode(UUID.self, forKey: .playerId)
             self = .leaveGame(playerId: playerId)
@@ -153,9 +144,6 @@ public enum ClientMessage: Codable, Sendable {
             try container.encode("updateLife", forKey: .action)
             try container.encode(playerId, forKey: .playerId)
             try container.encode(changeAmount, forKey: .changeAmount)
-        case .joinGame(let clerkUserId):
-            try container.encode("joinGame", forKey: .action)
-            try container.encode(clerkUserId, forKey: .clerkUserId)
         case .leaveGame(let playerId):
             try container.encode("leaveGame", forKey: .action)
             try container.encode(playerId, forKey: .playerId)

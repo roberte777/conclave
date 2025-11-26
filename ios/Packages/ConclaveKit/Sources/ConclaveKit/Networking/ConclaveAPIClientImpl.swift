@@ -24,6 +24,12 @@ public final class ConclaveAPIClientImpl: ConclaveClient, Sendable {
         self.init(baseURL: url, session: session)
     }
 
+    // MARK: - Authentication
+
+    public func setAuthToken(_ token: String?) async {
+        await httpClient.setAuthToken(token)
+    }
+
     // MARK: - ConclaveAPIClient Implementation
 
     public func health() async throws -> HealthResponse {
@@ -34,27 +40,20 @@ public final class ConclaveAPIClientImpl: ConclaveClient, Sendable {
         try await httpClient.stats()
     }
 
-    public func getUserHistory(clerkUserId: String) async throws -> GameHistory
-    {
-        try await httpClient.getUserHistory(clerkUserId: clerkUserId)
+    public func getUserHistory() async throws -> GameHistory {
+        try await httpClient.getUserHistory()
     }
 
-    public func getUserGames(clerkUserId: String) async throws
-        -> [GameWithUsers]
-    {
-        try await httpClient.getUserGames(clerkUserId: clerkUserId)
+    public func getUserGames() async throws -> [GameWithUsers] {
+        try await httpClient.getUserGames()
     }
 
-    public func getAvailableGames(clerkUserId: String) async throws
-        -> [GameWithUsers]
-    {
-        try await httpClient.getAvailableGames(clerkUserId: clerkUserId)
+    public func getAvailableGames() async throws -> [GameWithUsers] {
+        try await httpClient.getAvailableGames()
     }
 
     // NOTE: Development testing
-    public func getAllGames() async throws
-        -> [GameWithUsers]
-    {
+    public func getAllGames() async throws -> [GameWithUsers] {
         try await httpClient.getAllGames()
     }
 
@@ -70,14 +69,12 @@ public final class ConclaveAPIClientImpl: ConclaveClient, Sendable {
         try await httpClient.getGameState(gameId: gameId)
     }
 
-    public func joinGame(gameId: UUID, request: JoinGameRequest) async throws
-        -> Player
-    {
-        try await httpClient.joinGame(gameId: gameId, request: request)
+    public func joinGame(gameId: UUID) async throws -> Player {
+        try await httpClient.joinGame(gameId: gameId)
     }
 
-    public func leaveGame(gameId: UUID, request: JoinGameRequest) async throws {
-        try await httpClient.leaveGame(gameId: gameId, request: request)
+    public func leaveGame(gameId: UUID) async throws {
+        try await httpClient.leaveGame(gameId: gameId)
     }
 
     public func updateLife(gameId: UUID, request: UpdateLifeRequest)
@@ -133,10 +130,10 @@ public final class ConclaveAPIClientImpl: ConclaveClient, Sendable {
         }
     }
 
-    public func connect(gameId: UUID, clerkUserId: String) async throws {
+    public func connect(gameId: UUID, token: String) async throws {
         try await webSocketClient.connect(
             gameId: gameId,
-            clerkUserId: clerkUserId
+            token: token
         )
     }
 
@@ -153,10 +150,6 @@ public final class ConclaveAPIClientImpl: ConclaveClient, Sendable {
             playerId: playerId,
             changeAmount: changeAmount
         )
-    }
-
-    public func joinGame(clerkUserId: String) async throws {
-        try await webSocketClient.joinGame(clerkUserId: clerkUserId)
     }
 
     public func leaveGame(playerId: UUID) async throws {
