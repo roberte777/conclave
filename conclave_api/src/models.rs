@@ -25,6 +25,38 @@ pub struct Player {
     pub is_eliminated: bool,
 }
 
+/// Player with enriched user display info from Clerk
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlayerWithUser {
+    pub id: Uuid,
+    pub game_id: Uuid,
+    pub clerk_user_id: String,
+    pub current_life: i32,
+    pub position: i32,
+    pub is_eliminated: bool,
+    // User display info
+    pub display_name: String,
+    pub username: Option<String>,
+    pub image_url: Option<String>,
+}
+
+impl PlayerWithUser {
+    pub fn from_player(player: Player, display_name: String, username: Option<String>, image_url: Option<String>) -> Self {
+        Self {
+            id: player.id,
+            game_id: player.game_id,
+            clerk_user_id: player.clerk_user_id,
+            current_life: player.current_life,
+            position: player.position,
+            is_eliminated: player.is_eliminated,
+            display_name,
+            username,
+            image_url,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 #[serde(rename_all = "camelCase")]
 pub struct LifeChange {
@@ -55,14 +87,10 @@ pub struct CommanderDamage {
 pub struct CreateGameRequest {
     pub name: String,
     pub starting_life: Option<i32>, // Default to 20 if not provided
-    pub clerk_user_id: String,      // Creator's Clerk user ID
+    // clerk_user_id is now extracted from JWT token
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct JoinGameRequest {
-    pub clerk_user_id: String, // Clerk user ID
-}
+// JoinGameRequest is no longer needed - clerk_user_id comes from JWT
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -98,7 +126,7 @@ pub struct UserInfo {
 #[serde(rename_all = "camelCase")]
 pub struct GameState {
     pub game: Game,
-    pub players: Vec<Player>,
+    pub players: Vec<PlayerWithUser>,
     pub recent_changes: Vec<LifeChange>,
     pub commander_damage: Vec<CommanderDamage>,
 }
@@ -147,7 +175,7 @@ pub enum WebSocketMessage {
     },
     PlayerJoined {
         game_id: Uuid,
-        player: Player,
+        player: PlayerWithUser,
     },
     PlayerLeft {
         game_id: Uuid,
@@ -159,7 +187,7 @@ pub enum WebSocketMessage {
     },
     GameEnded {
         game_id: Uuid,
-        winner: Option<Player>,
+        winner: Option<PlayerWithUser>,
     },
     CommanderDamageUpdate {
         game_id: Uuid,
@@ -190,9 +218,7 @@ pub enum WebSocketRequest {
         player_id: Uuid,
         change_amount: i32,
     },
-    JoinGame {
-        clerk_user_id: String,
-    },
+    // JoinGame no longer needed - auto-join happens on WebSocket connection with JWT
     LeaveGame {
         player_id: Uuid,
     },

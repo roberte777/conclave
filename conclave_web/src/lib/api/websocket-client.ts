@@ -7,7 +7,8 @@ export type ErrorEventHandler = (error: Error) => void;
 export interface WebSocketClientConfig {
   url: string;
   gameId: string;
-  clerkUserId: string;
+  /** JWT token for authentication */
+  token: string;
   reconnectInterval?: number;
   maxReconnectAttempts?: number;
 }
@@ -41,7 +42,8 @@ export class WebSocketClient {
     const wsUrl = new URL(this.config.url);
     // Server expects camelCase query params per serde rename_all = "camelCase"
     wsUrl.searchParams.set("gameId", this.config.gameId);
-    wsUrl.searchParams.set("clerkUserId", this.config.clerkUserId);
+    // Pass JWT token for authentication instead of clerkUserId
+    wsUrl.searchParams.set("token", this.config.token);
 
     try {
       this.ws = new WebSocket(wsUrl.toString());
@@ -199,12 +201,7 @@ export class WebSocketClient {
     });
   }
 
-  joinGame(clerkUserId: string): void {
-    this.send({
-      action: "joinGame",
-      clerkUserId,
-    });
-  }
+  // joinGame is no longer needed - auto-join happens on WebSocket connection with JWT
 
   leaveGame(playerId: string): void {
     this.send({

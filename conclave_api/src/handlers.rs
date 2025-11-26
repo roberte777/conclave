@@ -1,4 +1,5 @@
 use crate::{
+    auth::AuthenticatedUser,
     database,
     errors::{ApiError, Result},
     models::*,
@@ -19,12 +20,14 @@ use uuid::Uuid;
 // Game endpoints
 pub async fn create_game(
     State(state): State<AppState>,
+    auth: AuthenticatedUser,
     Json(request): Json<CreateGameRequest>,
 ) -> Result<Json<Game>> {
     info!(
-        "Creating game: {} by user {} with starting life {}",
+        "Creating game: {} by user {} ({}) with starting life {}",
         request.name,
-        request.clerk_user_id,
+        auth.clerk_user_id,
+        auth.user.display_name(),
         request.starting_life.unwrap_or(DEFAULT_STARTING_LIFE)
     );
 
@@ -52,7 +55,7 @@ pub async fn create_game(
         &state.db,
         &request.name,
         starting_life,
-        &request.clerk_user_id,
+        &auth.clerk_user_id,
     )
     .await?;
 
@@ -66,34 +69,42 @@ pub async fn create_game(
 pub async fn join_game(
     State(state): State<AppState>,
     Path(game_id): Path<Uuid>,
-    Json(request): Json<JoinGameRequest>,
-) -> Result<Json<Player>> {
-    info!("User {} joining game {}", request.clerk_user_id, game_id);
+    auth: AuthenticatedUser,
+) -> Result<Json<PlayerWithUser>> {
+    info!("User {} ({}) joining game {}", auth.clerk_user_id, auth.user.display_name(), game_id);
 
-    let player = database::join_game(&state.db, game_id, &request.clerk_user_id).await?;
+    let player = database::join_game(&state.db, game_id, &auth.clerk_user_id).await?;
 
     // Broadcast player joined event to WebSocket clients
     websocket::broadcast_player_joined(&state, game_id, player.clone()).await;
 
+    // Return enriched player
+    let enriched_player = PlayerWithUser::from_player(
+        player.clone(),
+        auth.user.display_name(),
+        auth.user.username,
+        auth.user.image_url,
+    );
+
     info!(
         "User {} successfully joined game {} as player {}",
-        request.clerk_user_id, game_id, player.position
+        auth.clerk_user_id, game_id, player.position
     );
-    Ok(Json(player))
+    Ok(Json(enriched_player))
 }
 
 pub async fn leave_game(
     State(state): State<AppState>,
     Path(game_id): Path<Uuid>,
-    Json(request): Json<JoinGameRequest>, // Reusing JoinGameRequest since it just needs clerk_user_id
+    auth: AuthenticatedUser,
 ) -> Result<StatusCode> {
-    info!("User {} leaving game {}", request.clerk_user_id, game_id);
+    info!("User {} leaving game {}", auth.clerk_user_id, game_id);
 
-    database::leave_game(&state.db, game_id, &request.clerk_user_id).await?;
+    database::leave_game(&state.db, game_id, &auth.clerk_user_id).await?;
 
     info!(
         "User {} successfully left game {}",
-        request.clerk_user_id, game_id
+        auth.clerk_user_id, game_id
     );
     Ok(StatusCode::OK)
 }
@@ -112,31 +123,32 @@ pub async fn get_game_state(
     Path(game_id): Path<Uuid>,
 ) -> Result<Json<GameState>> {
     debug!("GET /api/v1/games/{}/state - Getting game state", game_id);
-    let game_state = database::get_game_state(&state.db, game_id).await?;
+    // Use enriched game state with user display info
+    let game_state = database::get_game_state_with_users(&state.db, game_id).await?;
     Ok(Json(game_state))
 }
 
 pub async fn get_user_games(
     State(state): State<AppState>,
-    Path(clerk_user_id): Path<String>,
+    auth: AuthenticatedUser,
 ) -> Result<Json<Vec<GameWithUsers>>> {
     debug!(
-        "GET /api/v1/users/{}/games - Getting user's games",
-        clerk_user_id
+        "GET /api/v1/users/me/games - Getting user's games for {}",
+        auth.clerk_user_id
     );
-    let games = database::get_user_games(&state.db, &clerk_user_id).await?;
+    let games = database::get_user_games(&state.db, &auth.clerk_user_id).await?;
     Ok(Json(games))
 }
 
 pub async fn get_available_games(
     State(state): State<AppState>,
-    Path(clerk_user_id): Path<String>,
+    auth: AuthenticatedUser,
 ) -> Result<Json<Vec<GameWithUsers>>> {
     debug!(
-        "GET /api/v1/users/{}/available-games - Getting available games for user",
-        clerk_user_id
+        "GET /api/v1/users/me/available-games - Getting available games for user {}",
+        auth.clerk_user_id
     );
-    let games = database::get_available_games(&state.db, &clerk_user_id).await?;
+    let games = database::get_available_games(&state.db, &auth.clerk_user_id).await?;
     Ok(Json(games))
 }
 
@@ -200,8 +212,15 @@ pub async fn end_game(
     let players = database::get_players_in_game(&state.db, game_id).await?;
     let winner = players.iter().max_by_key(|p| p.current_life).cloned();
 
-    // Broadcast game ended event
-    let message = WebSocketMessage::GameEnded { game_id, winner };
+    // Enrich winner with user info
+    let enriched_winner = if let Some(w) = winner {
+        Some(database::enrich_player_with_user(w).await)
+    } else {
+        None
+    };
+
+    // Broadcast game ended event with enriched winner
+    let message = WebSocketMessage::GameEnded { game_id, winner: enriched_winner };
     state.broadcast_to_game(game_id, message);
 
     // Clean up WebSocket room
@@ -216,13 +235,13 @@ pub async fn end_game(
 
 pub async fn get_user_history(
     State(state): State<AppState>,
-    Path(clerk_user_id): Path<String>,
+    auth: AuthenticatedUser,
 ) -> Result<Json<GameHistory>> {
     debug!(
-        "GET /api/v1/users/{}/history - Getting user's game history",
-        clerk_user_id
+        "GET /api/v1/users/me/history - Getting game history for user {}",
+        auth.clerk_user_id
     );
-    let history = database::get_user_game_history(&state.db, &clerk_user_id).await?;
+    let history = database::get_user_game_history(&state.db, &auth.clerk_user_id).await?;
     Ok(Json(history))
 }
 

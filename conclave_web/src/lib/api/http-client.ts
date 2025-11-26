@@ -6,7 +6,6 @@ import type {
   LifeChange,
   CommanderDamage,
   CreateGameRequest,
-  JoinGameRequest,
   UpdateLifeRequest,
   UpdateCommanderDamageRequest,
   TogglePartnerRequest,
@@ -83,19 +82,17 @@ export class HttpClient {
     });
   }
 
-  async joinGame(gameId: string, request: JoinGameRequest): Promise<Player> {
+  async joinGame(gameId: string): Promise<Player> {
+    // clerkUserId now comes from JWT token in Authorization header
     return this.request<Player>(`/games/${gameId}/join`, {
       method: "POST",
-      body: JSON.stringify(request),
     });
   }
 
-  async leaveGame(gameId: string, clerkUserId: string): Promise<void> {
-    // Backend expects clerkUserId in body at /games/{game_id}/leave
-    const body: JoinGameRequest = { clerkUserId };
+  async leaveGame(gameId: string): Promise<void> {
+    // clerkUserId now comes from JWT token in Authorization header
     await this.request<void>(`/games/${gameId}/leave`, {
       method: "POST",
-      body: JSON.stringify(body),
     });
   }
 
@@ -107,12 +104,14 @@ export class HttpClient {
     return this.request<GameState>(`/games/${gameId}/state`);
   }
 
-  async getUserGames(clerkUserId: string): Promise<GameWithUsers[]> {
-    return this.request<GameWithUsers[]>(`/users/${clerkUserId}/games`);
+  async getUserGames(): Promise<GameWithUsers[]> {
+    // Uses /users/me/ endpoint - clerkUserId comes from JWT
+    return this.request<GameWithUsers[]>(`/users/me/games`);
   }
 
-  async getAvailableGames(clerkUserId: string): Promise<GameWithUsers[]> {
-    return this.request<GameWithUsers[]>(`/users/${clerkUserId}/available-games`);
+  async getAvailableGames(): Promise<GameWithUsers[]> {
+    // Uses /users/me/ endpoint - clerkUserId comes from JWT
+    return this.request<GameWithUsers[]>(`/users/me/available-games`);
   }
 
   async updateLife(
@@ -131,8 +130,9 @@ export class HttpClient {
     });
   }
 
-  async getUserHistory(clerkUserId: string): Promise<GameHistory> {
-    return this.request<GameHistory>(`/users/${clerkUserId}/history`);
+  async getUserHistory(): Promise<GameHistory> {
+    // Uses /users/me/ endpoint - clerkUserId comes from JWT
+    return this.request<GameHistory>(`/users/me/history`);
   }
 
   async getRecentLifeChanges(

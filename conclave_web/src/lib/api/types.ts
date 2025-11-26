@@ -14,6 +14,10 @@ export interface Player {
   currentLife: number;
   position: number;
   isEliminated: boolean;
+  // User display info (enriched from backend)
+  displayName: string;
+  username?: string;
+  imageUrl?: string;
 }
 
 export interface LifeChange {
@@ -69,12 +73,10 @@ export interface GameEndResult {
 export interface CreateGameRequest {
   name: string;
   startingLife?: number;
-  clerkUserId: string;
+  // clerkUserId is now extracted from JWT token
 }
 
-export interface JoinGameRequest {
-  clerkUserId: string;
-}
+// JoinGameRequest is no longer needed - clerkUserId comes from JWT
 
 export interface UpdateLifeRequest {
   playerId: string;
@@ -149,10 +151,7 @@ export type WebSocketRequest =
       playerId: string;
       changeAmount: number;
     }
-  | {
-      action: "joinGame";
-      clerkUserId: string;
-    }
+  // joinGame action removed - auto-join happens on WebSocket connection with JWT
   | {
       action: "leaveGame";
       playerId: string;

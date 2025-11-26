@@ -1,3 +1,4 @@
+use crate::clerk::ClerkClient;
 use crate::errors::{ApiError, Result};
 use crate::models::*;
 use chrono::Utc;
@@ -287,17 +288,8 @@ pub async fn get_game_by_id(pool: &SqlitePool, game_id: Uuid) -> Result<Game> {
 }
 
 pub async fn get_game_state(pool: &SqlitePool, game_id: Uuid) -> Result<GameState> {
-    let game = get_game_by_id(pool, game_id).await?;
-    let players = get_players_in_game(pool, game_id).await?;
-    let recent_changes = get_recent_life_changes(pool, game_id, 20).await?;
-    let commander_damage = get_commander_damage_for_game(pool, game_id).await?;
-
-    Ok(GameState {
-        game,
-        players,
-        recent_changes,
-        commander_damage,
-    })
+    // Use enriched game state with user info (calls get_game_state_with_users internally)
+    get_game_state_with_users(pool, game_id).await
 }
 
 pub async fn get_players_in_game(pool: &SqlitePool, game_id: Uuid) -> Result<Vec<Player>> {
@@ -902,4 +894,52 @@ pub async fn get_available_games(
     }
 
     Ok(games)
+}
+
+/// Enrich a single player with user info from Clerk
+pub async fn enrich_player_with_user(player: Player) -> PlayerWithUser {
+    let clerk = ClerkClient::get().ok();
+    let user = if let Some(client) = clerk {
+        client.get_user_or_default(&player.clerk_user_id).await
+    } else {
+        crate::clerk::ClerkUser {
+            id: player.clerk_user_id.clone(),
+            username: None,
+            first_name: None,
+            last_name: None,
+            image_url: None,
+        }
+    };
+
+    PlayerWithUser::from_player(
+        player,
+        user.display_name(),
+        user.username,
+        user.image_url,
+    )
+}
+
+/// Enrich multiple players with user info from Clerk
+pub async fn enrich_players_with_users(players: Vec<Player>) -> Vec<PlayerWithUser> {
+    let mut enriched = Vec::with_capacity(players.len());
+    for player in players {
+        enriched.push(enrich_player_with_user(player).await);
+    }
+    enriched
+}
+
+/// Get game state with enriched player info
+pub async fn get_game_state_with_users(pool: &SqlitePool, game_id: Uuid) -> Result<GameState> {
+    let game = get_game_by_id(pool, game_id).await?;
+    let players = get_players_in_game(pool, game_id).await?;
+    let enriched_players = enrich_players_with_users(players).await;
+    let recent_changes = get_recent_life_changes(pool, game_id, 20).await?;
+    let commander_damage = get_commander_damage_for_game(pool, game_id).await?;
+
+    Ok(GameState {
+        game,
+        players: enriched_players,
+        recent_changes,
+        commander_damage,
+    })
 }
