@@ -120,20 +120,15 @@ function StatCard({
   value,
   subValue,
   gradient,
-  delay = 0,
 }: {
   icon: React.ElementType;
   label: string;
   value: string | number;
   subValue?: string;
   gradient: string;
-  delay?: number;
 }) {
   return (
-    <div
-      className="relative group overflow-hidden rounded-2xl p-[1px] animate-in fade-in slide-in-from-bottom-4 duration-500"
-      style={{ animationDelay: `${delay}ms` }}
-    >
+    <div className="relative group overflow-hidden rounded-2xl p-[1px]">
       <div className={`absolute inset-0 ${gradient} opacity-75 group-hover:opacity-100 transition-opacity duration-300`} />
       <div className="relative bg-card/95 backdrop-blur-xl rounded-2xl p-6 h-full">
         <div className="flex items-center gap-4">
@@ -142,9 +137,9 @@ function StatCard({
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm text-muted-foreground font-medium">{label}</p>
-            <p className="text-3xl font-bold tracking-tight">{value}</p>
+            <p className="text-3xl font-bold tracking-tight transition-all duration-300">{value}</p>
             {subValue && (
-              <p className="text-xs text-muted-foreground mt-1">{subValue}</p>
+              <p className="text-xs text-muted-foreground mt-1 transition-all duration-300">{subValue}</p>
             )}
           </div>
         </div>
@@ -156,21 +151,16 @@ function StatCard({
 function GameCard({
   game,
   clerkUserId,
-  index,
 }: {
   game: GameWithPlayers;
   clerkUserId: string;
-  index: number;
 }) {
   const isWin = game.winner?.clerkUserId === clerkUserId;
   const userPlayer = game.players.find((p) => p.clerkUserId === clerkUserId);
   const otherPlayers = game.players.filter((p) => p.clerkUserId !== clerkUserId);
 
   return (
-    <div
-      className="group animate-in fade-in slide-in-from-bottom-4 duration-500"
-      style={{ animationDelay: `${100 + index * 50}ms` }}
-    >
+    <div className="group">
       <Card className="relative overflow-hidden border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
         {/* Gradient accent bar */}
         <div
@@ -463,7 +453,7 @@ export function MatchHistory() {
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/20">
       <div className="container mx-auto px-4 py-8 max-w-6xl">
         {/* Header */}
-        <div className="mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
+        <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 rounded-lg bg-gradient-to-br from-primary/20 to-purple-500/20">
               <Trophy className="w-6 h-6 text-primary" />
@@ -476,7 +466,7 @@ export function MatchHistory() {
         </div>
 
         {/* Pod Filter Section */}
-        <div className="mb-8 animate-in fade-in slide-in-from-top-4 duration-500" style={{ animationDelay: "100ms" }}>
+        <div className="mb-8">
           <div className="relative overflow-hidden rounded-2xl border bg-card/50 backdrop-blur-sm">
             {/* Subtle gradient accent */}
             <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-purple-500/5 pointer-events-none" />
@@ -506,14 +496,13 @@ export function MatchHistory() {
 
         {/* Stats Grid */}
         {stats && stats.totalGames > 0 && (
-          <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 transition-opacity duration-300 ${isRefreshing ? "opacity-50" : "opacity-100"}`}>
+          <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 transition-opacity duration-300 ${!initialLoading ? "animate-in fade-in slide-in-from-bottom-4 duration-500" : ""} ${isRefreshing ? "opacity-50" : "opacity-100"}`}>
             <StatCard
               icon={Target}
               label="Total Matches"
               value={stats.totalGames}
               subValue={`${stats.wins}W - ${stats.losses}L`}
               gradient="bg-gradient-to-br from-blue-500 to-cyan-500"
-              delay={0}
             />
             <StatCard
               icon={Trophy}
@@ -521,7 +510,6 @@ export function MatchHistory() {
               value={stats.wins}
               subValue={stats.wins === 1 ? "1 win" : `${stats.wins} wins`}
               gradient="bg-gradient-to-br from-emerald-500 to-green-500"
-              delay={100}
             />
             <StatCard
               icon={TrendingUp}
@@ -529,7 +517,6 @@ export function MatchHistory() {
               value={`${stats.winRate}%`}
               subValue={stats.winRate >= 50 ? "Above average!" : "Keep going!"}
               gradient="bg-gradient-to-br from-purple-500 to-pink-500"
-              delay={200}
             />
             <StatCard
               icon={Heart}
@@ -537,13 +524,12 @@ export function MatchHistory() {
               value={stats.avgLifeRemaining}
               subValue="Life remaining"
               gradient="bg-gradient-to-br from-rose-500 to-orange-500"
-              delay={300}
             />
           </div>
         )}
 
         {/* Filter Tabs */}
-        <div className={`mb-6 animate-in fade-in slide-in-from-bottom-4 duration-500 transition-opacity ${isRefreshing ? "opacity-50" : "opacity-100"}`} style={{ animationDelay: "200ms" }}>
+        <div className={`mb-6 transition-opacity duration-300 ${!initialLoading ? "animate-in fade-in slide-in-from-bottom-4 duration-500" : ""} ${isRefreshing ? "opacity-50" : "opacity-100"}`}>
           <Tabs value={filter} onValueChange={setFilter}>
             <TabsList className="bg-muted/50 backdrop-blur-sm">
               <TabsTrigger value="all" className="gap-2">
@@ -565,12 +551,11 @@ export function MatchHistory() {
                 <EmptyState filter="all" />
               ) : (
                 <div className="grid gap-4">
-                  {filteredGames.map((game, index) => (
+                  {filteredGames.map((game) => (
                     <GameCard
                       key={game.game.id}
                       game={game}
                       clerkUserId={user?.id || ""}
-                      index={index}
                     />
                   ))}
                 </div>
@@ -582,12 +567,11 @@ export function MatchHistory() {
                 <EmptyState filter="wins" />
               ) : (
                 <div className="grid gap-4">
-                  {filteredGames.map((game, index) => (
+                  {filteredGames.map((game) => (
                     <GameCard
                       key={game.game.id}
                       game={game}
                       clerkUserId={user?.id || ""}
-                      index={index}
                     />
                   ))}
                 </div>
@@ -599,12 +583,11 @@ export function MatchHistory() {
                 <EmptyState filter="losses" />
               ) : (
                 <div className="grid gap-4">
-                  {filteredGames.map((game, index) => (
+                  {filteredGames.map((game) => (
                     <GameCard
                       key={game.game.id}
                       game={game}
                       clerkUserId={user?.id || ""}
-                      index={index}
                     />
                   ))}
                 </div>
