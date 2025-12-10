@@ -38,9 +38,9 @@ export function UserDashboard() {
 
   const api = useMemo(() => {
     const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-    return new ConclaveAPI({ 
+    return new ConclaveAPI({
       httpUrl: `${base}/api/v1`,
-      getAuthToken: getToken,
+      getAuthToken: () => getToken({ template: "default" }),
     });
   }, [getToken]);
 

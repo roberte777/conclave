@@ -47,8 +47,9 @@ impl ClerkUser {
     }
 }
 
-/// JWT Claims from Clerk tokens
+/// JWT Claims from Clerk tokens (includes custom, snake_case user fields)
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub struct ClerkClaims {
     /// Subject - the Clerk user ID
     pub sub: String,
@@ -60,6 +61,14 @@ pub struct ClerkClaims {
     pub iss: Option<String>,
     /// Authorized party (the frontend app)
     pub azp: Option<String>,
+    // Custom user fields included in the token to avoid extra API calls
+    pub id: Option<String>,
+    pub username: Option<String>,
+    pub first_name: Option<String>,
+    pub last_name: Option<String>,
+    pub image_url: Option<String>,
+    // Some setups may use "image" instead of "image_url"
+    pub image: Option<String>,
 }
 
 /// JWKS response from Clerk
@@ -248,20 +257,6 @@ impl ClerkClient {
         Ok(token_data.claims)
     }
 
-    fn validate_with_secret(&self, token: &str, secret: &str) -> Result<ClerkClaims> {
-        let mut validation = Validation::new(jsonwebtoken::Algorithm::RS256);
-        validation.validate_exp = true;
-
-        let decoding_key = DecodingKey::from_secret(secret.as_bytes());
-
-        let token_data = decode::<ClerkClaims>(token, &decoding_key, &validation).map_err(|e| {
-            error!("JWT validation with secret failed: {:?}", e);
-            ApiError::Unauthorized("Invalid or expired token".to_string())
-        })?;
-
-        Ok(token_data.claims)
-    }
-
     /// Fetch user info from Clerk API
     pub async fn get_user(&self, user_id: &str) -> Result<ClerkUser> {
         // Check cache first
@@ -358,6 +353,32 @@ pub async fn validate_and_get_user_id(token: &str) -> Result<String> {
 pub async fn validate_and_get_user(token: &str) -> Result<ClerkUser> {
     let client = ClerkClient::get()?;
     let claims = client.validate_token(token).await?;
-    client.get_user_or_default(&claims.sub).await;
-    Ok(client.get_user_or_default(&claims.sub).await)
+    // Prefer user info from claims (trusted if JWKS validated)
+    let id = claims.id.clone().unwrap_or_else(|| claims.sub.clone());
+    let image_url = claims.image_url.clone().or(claims.image.clone());
+    // If any profile fields are present in claims, use them directly
+    if claims.username.is_some()
+        || claims.first_name.is_some()
+        || claims.last_name.is_some()
+        || image_url.is_some()
+    {
+        return Ok(ClerkUser {
+            id,
+            username: claims.username.clone(),
+            first_name: claims.first_name.clone(),
+            last_name: claims.last_name.clone(),
+            image_url,
+        });
+    }
+    // Otherwise, fall back to REST fetch only if secret is available; else minimal user
+    if client.secret_key.is_some() {
+        return client.get_user(&claims.sub).await;
+    }
+    Ok(ClerkUser {
+        id,
+        username: None,
+        first_name: None,
+        last_name: None,
+        image_url: None,
+    })
 }

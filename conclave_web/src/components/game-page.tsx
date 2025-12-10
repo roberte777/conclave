@@ -32,7 +32,7 @@ export function GamePageClient({ gameId }: GamePageClientProps) {
 
         const connect = async () => {
             // Get JWT token for authentication
-            const token = await getToken();
+            const token = await getToken({ template: "default" });
             if (!token) {
                 setError("Not authenticated");
                 return;
