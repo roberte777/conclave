@@ -33,8 +33,8 @@ export function Header() {
               <Link
                 href="/"
                 className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-all ${pathname === "/"
-                    ? "bg-violet-500/20 text-violet-300"
-                    : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+                  ? "bg-violet-500/20 text-violet-300"
+                  : "text-muted-foreground hover:text-foreground hover:bg-white/5"
                   }`}
               >
                 <Home className="w-4 h-4" />
@@ -43,8 +43,8 @@ export function Header() {
               <Link
                 href="/history"
                 className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-all ${pathname === "/history"
-                    ? "bg-violet-500/20 text-violet-300"
-                    : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+                  ? "bg-violet-500/20 text-violet-300"
+                  : "text-muted-foreground hover:text-foreground hover:bg-white/5"
                   }`}
               >
                 <Trophy className="w-4 h-4" />
@@ -74,8 +74,8 @@ export function Header() {
               <Link
                 href="/"
                 className={`p-2 rounded-lg transition-all ${pathname === "/"
-                    ? "bg-violet-500/20 text-violet-300"
-                    : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+                  ? "bg-violet-500/20 text-violet-300"
+                  : "text-muted-foreground hover:text-foreground hover:bg-white/5"
                   }`}
                 title="Dashboard"
               >
@@ -84,8 +84,8 @@ export function Header() {
               <Link
                 href="/history"
                 className={`p-2 rounded-lg transition-all ${pathname === "/history"
-                    ? "bg-violet-500/20 text-violet-300"
-                    : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+                  ? "bg-violet-500/20 text-violet-300"
+                  : "text-muted-foreground hover:text-foreground hover:bg-white/5"
                   }`}
                 title="Match History"
               >

@@ -29,6 +29,7 @@ import {
   Crown,
 } from "lucide-react";
 import { ConclaveAPI, type GameHistory, type GameWithPlayers, type Player } from "@/lib/api";
+import { PodFilter } from "@/components/pod-filter";
 
 interface MatchStats {
   totalGames: number;
@@ -174,8 +175,8 @@ function GameCard({
         {/* Gradient accent bar */}
         <div
           className={`absolute top-0 left-0 right-0 h-1 ${isWin
-              ? "bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500"
-              : "bg-gradient-to-r from-rose-500 via-red-500 to-pink-500"
+            ? "bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500"
+            : "bg-gradient-to-r from-rose-500 via-red-500 to-pink-500"
             }`}
         />
 
@@ -195,7 +196,9 @@ function GameCard({
         </div>
 
         <CardHeader className="pb-3">
-          <CardTitle className="text-xl pr-24">{game.game.name}</CardTitle>
+          <CardTitle className="text-xl pr-24">
+            Game {game.game.id.slice(0, 8)}
+          </CardTitle>
           <CardDescription className="flex items-center gap-4 text-xs">
             <span className="flex items-center gap-1.5">
               <Calendar className="w-3.5 h-3.5" />
@@ -263,8 +266,8 @@ function GameCard({
                   <div
                     key={player.id}
                     className={`flex items-center justify-between p-3 rounded-lg transition-colors ${isWinner
-                        ? "bg-emerald-500/5 border border-emerald-500/20"
-                        : "bg-muted/30 hover:bg-muted/50"
+                      ? "bg-emerald-500/5 border border-emerald-500/20"
+                      : "bg-muted/30 hover:bg-muted/50"
                       }`}
                   >
                     <div className="flex items-center gap-3">
@@ -351,8 +354,11 @@ export function MatchHistory() {
   const { user } = useUser();
   const { getToken } = useAuth();
   const [history, setHistory] = useState<GameHistory | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [allPlayersCache, setAllPlayersCache] = useState<Player[]>([]); // Cache all players from initial load
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [filter, setFilter] = useState("all");
+  const [selectedPodPlayerIds, setSelectedPodPlayerIds] = useState<string[]>([]);
 
   const api = useMemo(() => {
     const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
@@ -362,23 +368,62 @@ export function MatchHistory() {
     });
   }, [getToken]);
 
-  const fetchHistory = useCallback(async () => {
-    if (!user?.id) return;
+  // Initial fetch - get all history and cache players
+  useEffect(() => {
+    const fetchInitialHistory = async () => {
+      if (!user?.id) return;
 
-    setLoading(true);
-    try {
-      const data = await api.http.getUserHistory();
-      setHistory(data);
-    } catch (error) {
-      console.error("Failed to fetch match history:", error);
-    } finally {
-      setLoading(false);
-    }
+      setInitialLoading(true);
+      try {
+        const data = await api.http.getUserHistory();
+        setHistory(data);
+
+        // Cache all unique players from the full history
+        const playerMap = new Map<string, Player>();
+        data.games.forEach((game) => {
+          game.players.forEach((player) => {
+            if (!playerMap.has(player.clerkUserId)) {
+              playerMap.set(player.clerkUserId, player);
+            }
+          });
+        });
+        setAllPlayersCache(Array.from(playerMap.values()));
+      } catch (error) {
+        console.error("Failed to fetch match history:", error);
+      } finally {
+        setInitialLoading(false);
+      }
+    };
+
+    fetchInitialHistory();
   }, [api, user?.id]);
 
+  // Fetch filtered history when pod selection changes (not on initial load)
   useEffect(() => {
-    fetchHistory();
-  }, [fetchHistory]);
+    const fetchFilteredHistory = async () => {
+      if (!user?.id || initialLoading) return;
+
+      setIsRefreshing(true);
+      try {
+        let data: GameHistory;
+        if (selectedPodPlayerIds.length > 0) {
+          data = await api.http.getUserHistoryWithPod(selectedPodPlayerIds);
+        } else {
+          data = await api.http.getUserHistory();
+        }
+        setHistory(data);
+      } catch (error) {
+        console.error("Failed to fetch filtered history:", error);
+      } finally {
+        setIsRefreshing(false);
+      }
+    };
+
+    fetchFilteredHistory();
+  }, [api, user?.id, selectedPodPlayerIds, initialLoading]);
+
+  // Use cached players for the filter (so they don't disappear when filtering)
+  const allPlayers = allPlayersCache;
 
   const stats = useMemo(() => {
     if (!history || !user?.id) return null;
@@ -398,7 +443,7 @@ export function MatchHistory() {
     }
   }, [history, user?.id, filter]);
 
-  if (loading) {
+  if (initialLoading) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="flex flex-col items-center gap-4 animate-pulse">
@@ -430,9 +475,38 @@ export function MatchHistory() {
           </p>
         </div>
 
+        {/* Pod Filter Section */}
+        <div className="mb-8 animate-in fade-in slide-in-from-top-4 duration-500" style={{ animationDelay: "100ms" }}>
+          <div className="relative overflow-hidden rounded-2xl border bg-card/50 backdrop-blur-sm">
+            {/* Subtle gradient accent */}
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-purple-500/5 pointer-events-none" />
+
+            <div className="relative p-5">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 rounded-lg bg-gradient-to-br from-primary/20 to-purple-500/20">
+                  <Users className="w-4 h-4 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold">Pod Stats</h3>
+                  <p className="text-xs text-muted-foreground">
+                    See your record against specific player groups
+                  </p>
+                </div>
+              </div>
+
+              <PodFilter
+                availablePlayers={allPlayers}
+                selectedPlayerIds={selectedPodPlayerIds}
+                onSelectionChange={setSelectedPodPlayerIds}
+                currentUserId={user?.id || ""}
+              />
+            </div>
+          </div>
+        </div>
+
         {/* Stats Grid */}
         {stats && stats.totalGames > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 transition-opacity duration-300 ${isRefreshing ? "opacity-50" : "opacity-100"}`}>
             <StatCard
               icon={Target}
               label="Total Matches"
@@ -469,7 +543,7 @@ export function MatchHistory() {
         )}
 
         {/* Filter Tabs */}
-        <div className="mb-6 animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: "200ms" }}>
+        <div className={`mb-6 animate-in fade-in slide-in-from-bottom-4 duration-500 transition-opacity ${isRefreshing ? "opacity-50" : "opacity-100"}`} style={{ animationDelay: "200ms" }}>
           <Tabs value={filter} onValueChange={setFilter}>
             <TabsList className="bg-muted/50 backdrop-blur-sm">
               <TabsTrigger value="all" className="gap-2">

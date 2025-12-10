@@ -136,6 +136,13 @@ export class HttpClient {
     return this.request<GameHistory>(`/users/me/history`);
   }
 
+  async getUserHistoryWithPod(podUserIds: string[]): Promise<GameHistory> {
+    // Uses /users/me/history/pod/ endpoint - clerkUserId comes from JWT
+    // podUserIds is an array of clerk user IDs to filter by (the "pod")
+    const podFilter = podUserIds.join(',');
+    return this.request<GameHistory>(`/users/me/history/pod/${encodeURIComponent(podFilter)}`);
+  }
+
   async getRecentLifeChanges(
     gameId: string,
     limit: number = 10

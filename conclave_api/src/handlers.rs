@@ -252,7 +252,41 @@ pub async fn get_user_history(
         "GET /api/v1/users/me/history - Getting game history for user {}",
         auth.clerk_user_id
     );
-    let history = database::get_user_game_history(&state.db, &auth.clerk_user_id).await?;
+    let history = database::get_user_game_history(&state.db, &auth.clerk_user_id, None).await?;
+    Ok(Json(history))
+}
+
+pub async fn get_user_history_with_pod(
+    State(state): State<AppState>,
+    Path(pod_filter): Path<String>, // comma-separated clerk_user_ids
+    auth: AuthenticatedUser,
+) -> Result<Json<GameHistory>> {
+    debug!(
+        "GET /api/v1/users/me/history/pod/{} - Getting pod game history for user {}",
+        pod_filter, auth.clerk_user_id
+    );
+
+    // Parse the comma-separated user IDs
+    let pod_user_ids: Vec<String> = pod_filter
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    if pod_user_ids.is_empty() {
+        return Err(ApiError::BadRequest(
+            "Pod filter cannot be empty".to_string(),
+        ));
+    }
+
+    // Include the authenticated user in the pod if not already present
+    let mut full_pod = pod_user_ids;
+    if !full_pod.contains(&auth.clerk_user_id) {
+        full_pod.push(auth.clerk_user_id.clone());
+    }
+
+    let history =
+        database::get_user_game_history(&state.db, &auth.clerk_user_id, Some(full_pod)).await?;
     Ok(Json(history))
 }
 

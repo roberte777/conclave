@@ -65,6 +65,10 @@ async fn main() -> anyhow::Result<()> {
         .route("/stats", get(handlers::get_stats))
         // User endpoints (authenticated via JWT - uses /users/me/ pattern)
         .route("/users/me/history", get(handlers::get_user_history))
+        .route(
+            "/users/me/history/pod/{pod_filter}",
+            get(handlers::get_user_history_with_pod),
+        )
         .route("/users/me/games", get(handlers::get_user_games))
         .route(
             "/users/me/available-games",
