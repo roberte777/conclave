@@ -42,7 +42,7 @@ interface MatchStats {
 function calculateStats(history: GameHistory, clerkUserId: string): MatchStats {
   const games = history.games;
   const totalGames = games.length;
-  
+
   let wins = 0;
   let totalLifeWhenWon = 0;
   let bestWin: GameWithPlayers | null = null;
@@ -173,11 +173,10 @@ function GameCard({
       <Card className="relative overflow-hidden border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
         {/* Gradient accent bar */}
         <div
-          className={`absolute top-0 left-0 right-0 h-1 ${
-            isWin
+          className={`absolute top-0 left-0 right-0 h-1 ${isWin
               ? "bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500"
               : "bg-gradient-to-r from-rose-500 via-red-500 to-pink-500"
-          }`}
+            }`}
         />
 
         {/* Win/Loss Badge */}
@@ -263,9 +262,10 @@ function GameCard({
                 return (
                   <div
                     key={player.id}
-                    className={`flex items-center justify-between p-3 rounded-lg transition-colors ${
-                      isWinner ? "bg-emerald-500/5 border border-emerald-500/20" : "bg-muted/30 hover:bg-muted/50"
-                    }`}
+                    className={`flex items-center justify-between p-3 rounded-lg transition-colors ${isWinner
+                        ? "bg-emerald-500/5 border border-emerald-500/20"
+                        : "bg-muted/30 hover:bg-muted/50"
+                      }`}
                   >
                     <div className="flex items-center gap-3">
                       <div className="relative">
@@ -387,7 +387,7 @@ export function MatchHistory() {
 
   const filteredGames = useMemo(() => {
     if (!history || !user?.id) return [];
-    
+
     switch (filter) {
       case "wins":
         return history.games.filter((g) => g.winner?.clerkUserId === user.id);
