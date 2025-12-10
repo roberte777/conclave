@@ -3,16 +3,54 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConclaveAPI, type GameState, type Player } from "@/lib/api";
 import Image from "next/image";
-import { Swords } from "lucide-react";
+import Link from "next/link";
+import {
+    Swords,
+    ChevronUp,
+    ChevronDown,
+    Crown,
+    Users,
+    Wifi,
+    WifiOff,
+    Home,
+    RefreshCw,
+    Power,
+    Shield,
+    Sparkles,
+    X,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Tooltip } from "@/components/ui/tooltip";
 
 interface GamePageClientProps {
     gameId: string;
 }
 
 type PartnerState = Record<string, boolean>;
+
+const PLAYER_COLORS = [
+    "from-violet-500/30 to-purple-600/10 border-violet-500/30",
+    "from-blue-500/30 to-cyan-600/10 border-blue-500/30",
+    "from-emerald-500/30 to-green-600/10 border-emerald-500/30",
+    "from-amber-500/30 to-orange-600/10 border-amber-500/30",
+    "from-rose-500/30 to-red-600/10 border-rose-500/30",
+    "from-pink-500/30 to-fuchsia-600/10 border-pink-500/30",
+    "from-teal-500/30 to-cyan-600/10 border-teal-500/30",
+    "from-indigo-500/30 to-blue-600/10 border-indigo-500/30",
+];
+
+const PLAYER_ACCENTS = [
+    "text-violet-400",
+    "text-blue-400",
+    "text-emerald-400",
+    "text-amber-400",
+    "text-rose-400",
+    "text-pink-400",
+    "text-teal-400",
+    "text-indigo-400",
+];
 
 export function GamePageClient({ gameId }: GamePageClientProps) {
     const { getToken } = useAuth();
@@ -23,7 +61,8 @@ export function GamePageClient({ gameId }: GamePageClientProps) {
     const [state, setState] = useState<GameState | null>(null);
     const [partnerEnabled, setPartnerEnabled] = useState<PartnerState>({});
     const [winner, setWinner] = useState<Player | null>(null);
-    const [showIncomingDamage, setShowIncomingDamage] = useState<Record<string, boolean>>({});
+    const [expandedPlayer, setExpandedPlayer] = useState<string | null>(null);
+    const [animatingLife, setAnimatingLife] = useState<Record<string, boolean>>({});
 
     // Establish websocket connection and wire up handlers
     useEffect(() => {
@@ -31,7 +70,6 @@ export function GamePageClient({ gameId }: GamePageClientProps) {
         let cleanupFunctions: (() => void)[] = [];
 
         const connect = async () => {
-            // Get JWT token for authentication
             const token = await getToken({ template: "default" });
             if (!token) {
                 setError("Not authenticated");
@@ -64,7 +102,6 @@ export function GamePageClient({ gameId }: GamePageClientProps) {
                             commanderDamage: message.commanderDamage,
                         };
                         setState(next);
-                        // No need to fetch display names - they come from the backend now!
                         break;
                     }
                     case "lifeUpdate": {
@@ -75,13 +112,16 @@ export function GamePageClient({ gameId }: GamePageClientProps) {
                             );
                             return { ...prev, players };
                         });
+                        // Trigger animation
+                        setAnimatingLife((prev) => ({ ...prev, [message.playerId]: true }));
+                        setTimeout(() => {
+                            setAnimatingLife((prev) => ({ ...prev, [message.playerId]: false }));
+                        }, 200);
                         break;
                     }
                     case "playerJoined": {
-                        // Add the new player directly - they come with display info!
                         setState((prev) => {
                             if (!prev) return prev;
-                            // Check if player already exists
                             if (prev.players.some(p => p.id === message.player.id)) {
                                 return prev;
                             }
@@ -90,12 +130,10 @@ export function GamePageClient({ gameId }: GamePageClientProps) {
                                 players: [...prev.players, message.player],
                             };
                         });
-                        // Refresh full state to sync commander damage matrix
                         ws?.getGameState();
                         break;
                     }
                     case "playerLeft": {
-                        // Optimistically remove player and refresh to sync damage matrix
                         setState((prev) => {
                             if (!prev) return prev;
                             const players = prev.players.filter((p) => p.id !== message.playerId);
@@ -207,164 +245,368 @@ export function GamePageClient({ gameId }: GamePageClientProps) {
         [api, partnerEnabled]
     );
 
+    const getTotalCommanderDamage = useCallback(
+        (toId: string) => {
+            if (!state) return 0;
+            return state.commanderDamage
+                .filter((cd) => cd.toPlayerId === toId)
+                .reduce((sum, cd) => sum + cd.damage, 0);
+        },
+        [state]
+    );
+
     if (error) {
         return (
-            <div className="container mx-auto px-4 py-8">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Error</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-red-500">{error}</p>
-                    </CardContent>
-                </Card>
+            <div className="min-h-screen bg-gradient-mesh flex items-center justify-center p-4">
+                <div className="glass-card rounded-2xl p-8 max-w-md w-full text-center animate-fade-in-up">
+                    <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-red-500/20 flex items-center justify-center">
+                        <X className="w-8 h-8 text-red-400" />
+                    </div>
+                    <h2 className="text-2xl font-bold mb-3">Connection Error</h2>
+                    <p className="text-muted-foreground mb-6">{error}</p>
+                    <div className="flex gap-3 justify-center">
+                        <Button asChild variant="outline">
+                            <Link href="/">
+                                <Home className="w-4 h-4 mr-2" />
+                                Go Home
+                            </Link>
+                        </Button>
+                        <Button onClick={() => window.location.reload()}>
+                            <RefreshCw className="w-4 h-4 mr-2" />
+                            Retry
+                        </Button>
+                    </div>
+                </div>
             </div>
         );
     }
 
     return (
-        <div className="container mx-auto px-4 py-8">
-            <div className="flex items-center justify-between mb-6">
-                <div>
-                    <h1 className="text-2xl font-bold">{state?.game.name || "Game"}</h1>
-                    <p className="text-sm text-muted-foreground">
-                        {isConnected ? "Connected" : "Connecting..."} • ID: {gameId}
-                    </p>
-                </div>
-                <div className="flex items-center gap-2">
-                    <Button variant="outline" onClick={() => api.ws?.getGameState()} disabled={!isConnected}>
-                        Refresh State
-                    </Button>
-                    <Button variant="destructive" onClick={endGame} disabled={!isConnected || !state || state.game.status === "finished"}>
-                        End Game
-                    </Button>
+        <div className="min-h-screen bg-gradient-mesh">
+            {/* Header Bar */}
+            <div className="glass border-b border-white/10 sticky top-0 z-50">
+                <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <Link
+                            href="/"
+                            className="p-2 rounded-lg hover:bg-white/10 transition-colors"
+                            title="Back to Dashboard"
+                        >
+                            <Home className="w-5 h-5" />
+                        </Link>
+                        <div>
+                            <h1 className="text-lg font-bold flex items-center gap-2">
+                                {state?.game.name || "Loading..."}
+                                {winner && (
+                                    <span className="text-xs px-2 py-1 rounded-full bg-amber-500/20 text-amber-400 font-medium">
+                                        Finished
+                                    </span>
+                                )}
+                            </h1>
+                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                <span className="flex items-center gap-1">
+                                    {isConnected ? (
+                                        <>
+                                            <Wifi className="w-3 h-3 text-emerald-400" />
+                                            <span className="text-emerald-400">Live</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <WifiOff className="w-3 h-3 text-red-400" />
+                                            <span className="text-red-400">Connecting...</span>
+                                        </>
+                                    )}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                    <Users className="w-3 h-3" />
+                                    {state?.players.length || 0} players
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => api.ws?.getGameState()}
+                            disabled={!isConnected}
+                            className="text-muted-foreground hover:text-foreground"
+                        >
+                            <RefreshCw className="w-4 h-4" />
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={endGame}
+                            disabled={!isConnected || !state || state.game.status === "finished"}
+                            className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                        >
+                            <Power className="w-4 h-4 mr-1" />
+                            End
+                        </Button>
+                    </div>
                 </div>
             </div>
 
+            {/* Winner Banner */}
             {winner && (
-                <Card className="mb-6">
-                    <CardHeader>
-                        <CardTitle>Game Ended</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p>
-                            Winner: <span className="font-semibold">{winner.displayName}</span> with {winner.currentLife} life
-                        </p>
-                    </CardContent>
-                </Card>
+                <div className="bg-gradient-to-r from-amber-500/20 via-yellow-500/20 to-amber-500/20 border-b border-amber-500/30 animate-fade-in-up">
+                    <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-center gap-4">
+                        <Crown className="w-6 h-6 text-amber-400" />
+                        <span className="text-lg font-semibold">
+                            <span className="text-amber-400">{winner.displayName}</span> wins with{" "}
+                            <span className="text-amber-400">{winner.currentLife}</span> life!
+                        </span>
+                        <Crown className="w-6 h-6 text-amber-400" />
+                    </div>
+                </div>
             )}
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {(state?.players || []).map((p) => (
-                    <Card key={p.id}>
-                        <CardHeader>
-                            <CardTitle className="flex items-center justify-between">
-                                <span className="flex items-center gap-2 min-w-0">
-                                    {p.imageUrl ? (
-                                        <Image
-                                            src={p.imageUrl}
-                                            alt={p.displayName}
-                                            width={20}
-                                            height={20}
-                                            className="rounded-full"
-                                        />
-                                    ) : null}
-                                    <span className="truncate max-w-[160px]">
-                                        P{p.position}: {p.displayName}
-                                    </span>
-                                </span>
-                                <div className="flex items-center gap-2">
-                                    <Button
-                                        size="icon"
-                                        variant={showIncomingDamage[p.id] ? "default" : "outline"}
-                                        className="h-8 w-8"
-                                        onClick={() =>
-                                            setShowIncomingDamage((prev) => ({ ...prev, [p.id]: !prev[p.id] }))
-                                        }
-                                        disabled={!isConnected}
-                                        title={showIncomingDamage[p.id] ? "Hide commander damage" : "Show commander damage"}
-                                    >
-                                        <Swords className="h-4 w-4" />
-                                    </Button>
-                                    <Button size="sm" variant={partnerEnabled[p.id] ? "default" : "outline"} onClick={() => togglePartner(p.id)} disabled={!isConnected}>
-                                        {partnerEnabled[p.id] ? "Partner On" : "Partner Off"}
-                                    </Button>
-                                </div>
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <div className="text-4xl font-bold leading-none">{p.currentLife}</div>
-                                    <div className="text-sm text-muted-foreground">Life</div>
-                                </div>
-                                <div className="flex gap-2">
-                                    <div className="flex flex-col gap-2">
-                                        <Button size="sm" onClick={() => changeLife(p.id, +1)} disabled={!isConnected}>
-                                            +1
-                                        </Button>
-                                        <Button size="sm" onClick={() => changeLife(p.id, +5)} disabled={!isConnected}>
-                                            +5
-                                        </Button>
-                                    </div>
-                                    <div className="flex flex-col gap-2">
-                                        <Button size="sm" variant="secondary" onClick={() => changeLife(p.id, -1)} disabled={!isConnected}>
-                                            -1
-                                        </Button>
-                                        <Button size="sm" variant="secondary" onClick={() => changeLife(p.id, -5)} disabled={!isConnected}>
-                                            -5
-                                        </Button>
-                                    </div>
-                                </div>
+            {/* Main Content */}
+            <div className="max-w-7xl mx-auto p-4 md:p-6">
+                {!state ? (
+                    <div className="flex items-center justify-center min-h-[60vh]">
+                        <div className="text-center">
+                            <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-primary/20 animate-pulse flex items-center justify-center">
+                                <Sparkles className="w-8 h-8 text-primary" />
                             </div>
+                            <p className="text-lg text-muted-foreground">Loading game...</p>
+                        </div>
+                    </div>
+                ) : (
+                    <div className={cn(
+                        "grid gap-4 md:gap-6",
+                        state.players.length === 1 && "grid-cols-1 max-w-lg mx-auto",
+                        state.players.length === 2 && "grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto",
+                        state.players.length === 3 && "grid-cols-1 md:grid-cols-2 lg:grid-cols-3",
+                        state.players.length === 4 && "grid-cols-2 lg:grid-cols-4",
+                        state.players.length >= 5 && "grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                    )}>
+                        {state.players.map((player, index) => {
+                            const colorClass = PLAYER_COLORS[index % PLAYER_COLORS.length];
+                            const accentClass = PLAYER_ACCENTS[index % PLAYER_ACCENTS.length];
+                            const isExpanded = expandedPlayer === player.id;
+                            const totalCmdDamage = getTotalCommanderDamage(player.id);
+                            const isDanger = player.currentLife <= 10;
+                            const isCritical = player.currentLife <= 5;
+                            const isAnimating = animatingLife[player.id];
 
-                            {/* Commander damage (incoming) - hidden by default and toggled via swords icon */}
-                            {state && state.players.length > 1 && showIncomingDamage[p.id] ? (
-                                <div className="mt-4">
-                                    <div className="text-sm font-medium mb-2">Incoming commander damage</div>
-                                    <div className="flex gap-3 overflow-x-auto">
-                                        {state.players
-                                            .filter((from) => from.id !== p.id)
-                                            .map((from) => (
-                                                <div key={from.id} className="border rounded-md p-2 min-w-[160px]">
-                                                    <div className="text-xs mb-1">from P{from.position}</div>
-                                                    {[1, ...(partnerEnabled[from.id] ? [2] : [])].map((cmd) => (
-                                                        <div key={cmd} className="flex items-center justify-between gap-2">
-                                                            <span className="text-xs">
-                                                                C{cmd}: {getCommanderDamage(from.id, p.id, cmd)}
-                                                            </span>
-                                                            <div className="flex gap-1">
-                                                                <Button
-                                                                    size="icon"
-                                                                    variant="secondary"
-                                                                    className="h-7 w-7"
-                                                                    onClick={() => changeCommanderDamage(from.id, p.id, cmd, -1)}
-                                                                    disabled={!isConnected}
-                                                                >
-                                                                    -
-                                                                </Button>
-                                                                <Button
-                                                                    size="icon"
-                                                                    className="h-7 w-7"
-                                                                    onClick={() => changeCommanderDamage(from.id, p.id, cmd, +1)}
-                                                                    disabled={!isConnected}
-                                                                >
-                                                                    +
-                                                                </Button>
+                            return (
+                                <div
+                                    key={player.id}
+                                    className={cn(
+                                        "life-counter relative rounded-2xl border overflow-hidden",
+                                        "bg-gradient-to-br",
+                                        colorClass,
+                                        "backdrop-blur-xl transition-all duration-300",
+                                        isExpanded && "col-span-full lg:col-span-2"
+                                    )}
+                                >
+                                    {/* Player Header */}
+                                    <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            {player.imageUrl ? (
+                                                <Image
+                                                    src={player.imageUrl}
+                                                    alt={player.displayName}
+                                                    width={36}
+                                                    height={36}
+                                                    className="rounded-full ring-2 ring-white/20"
+                                                />
+                                            ) : (
+                                                <div className={cn(
+                                                    "w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm",
+                                                    "bg-white/10"
+                                                )}>
+                                                    {player.displayName.charAt(0).toUpperCase()}
+                                                </div>
+                                            )}
+                                            <div className="min-w-0">
+                                                <div className="font-semibold truncate">
+                                                    {player.displayName}
+                                                </div>
+                                                <div className={cn("text-xs", accentClass)}>
+                                                    Player {player.position}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            <Tooltip content={partnerEnabled[player.id] ? "Disable partner" : "Enable partner"} side="bottom">
+                                                <button
+                                                    onClick={() => togglePartner(player.id)}
+                                                    disabled={!isConnected}
+                                                    className={cn(
+                                                        "p-2 rounded-lg transition-all",
+                                                        partnerEnabled[player.id]
+                                                            ? "bg-primary/30 text-primary hover:bg-primary/40"
+                                                            : "bg-white/5 text-muted-foreground hover:bg-white/10 hover:text-foreground"
+                                                    )}
+                                                >
+                                                    <Shield className="w-4 h-4" />
+                                                </button>
+                                            </Tooltip>
+                                            <Tooltip content={isExpanded ? "Hide commander damage" : "Show commander damage"} side="bottom">
+                                                <button
+                                                    onClick={() => setExpandedPlayer(isExpanded ? null : player.id)}
+                                                    className={cn(
+                                                        "p-2 rounded-lg transition-all",
+                                                        isExpanded
+                                                            ? "bg-primary/30 text-primary hover:bg-primary/40"
+                                                            : "bg-white/5 text-muted-foreground hover:bg-white/10 hover:text-foreground"
+                                                    )}
+                                                >
+                                                    <Swords className="w-4 h-4" />
+                                                </button>
+                                            </Tooltip>
+                                        </div>
+                                    </div>
+
+                                    {/* Life Counter Section */}
+                                    <div className="p-4 md:p-6">
+                                        <div className="flex items-center justify-between gap-4">
+                                            {/* Decrease Buttons */}
+                                            <div className="flex flex-col gap-2">
+                                                <button
+                                                    onClick={() => changeLife(player.id, -1)}
+                                                    disabled={!isConnected}
+                                                    className="life-button life-button-decrease w-12 h-12 md:w-14 md:h-14 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-lg flex items-center justify-center disabled:opacity-50 transition-all"
+                                                >
+                                                    <ChevronDown className="w-6 h-6" />
+                                                </button>
+                                                <button
+                                                    onClick={() => changeLife(player.id, -5)}
+                                                    disabled={!isConnected}
+                                                    className="life-button life-button-decrease w-12 h-12 md:w-14 md:h-14 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400/80 font-semibold flex items-center justify-center disabled:opacity-50 transition-all"
+                                                >
+                                                    -5
+                                                </button>
+                                            </div>
+
+                                            {/* Life Total */}
+                                            <div className="flex-1 text-center">
+                                                <div
+                                                    className={cn(
+                                                        "text-6xl md:text-7xl lg:text-8xl font-black tabular-nums transition-all",
+                                                        isAnimating && "animate-counter-bump",
+                                                        isCritical && "text-red-400",
+                                                        isDanger && !isCritical && "text-amber-400"
+                                                    )}
+                                                >
+                                                    {player.currentLife}
+                                                </div>
+                                                <div className="text-sm text-muted-foreground mt-1 flex items-center justify-center gap-3">
+                                                    <span>Life</span>
+                                                    {totalCmdDamage > 0 && (
+                                                        <span className="flex items-center gap-1 text-orange-400">
+                                                            <Swords className="w-3 h-3" />
+                                                            {totalCmdDamage}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Increase Buttons */}
+                                            <div className="flex flex-col gap-2">
+                                                <button
+                                                    onClick={() => changeLife(player.id, +1)}
+                                                    disabled={!isConnected}
+                                                    className="life-button life-button-increase w-12 h-12 md:w-14 md:h-14 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 font-bold text-lg flex items-center justify-center disabled:opacity-50 transition-all"
+                                                >
+                                                    <ChevronUp className="w-6 h-6" />
+                                                </button>
+                                                <button
+                                                    onClick={() => changeLife(player.id, +5)}
+                                                    disabled={!isConnected}
+                                                    className="life-button life-button-increase w-12 h-12 md:w-14 md:h-14 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400/80 font-semibold flex items-center justify-center disabled:opacity-50 transition-all"
+                                                >
+                                                    +5
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Commander Damage Section (Expanded) */}
+                                    {isExpanded && state.players.length > 1 && (
+                                        <div className="px-4 pb-4 md:px-6 md:pb-6 border-t border-white/10 pt-4 animate-fade-in-up">
+                                            <div className="text-sm font-medium mb-3 flex items-center gap-2">
+                                                <Swords className="w-4 h-4 text-orange-400" />
+                                                Incoming Commander Damage
+                                            </div>
+                                            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                                                {state.players
+                                                    .filter((from) => from.id !== player.id)
+                                                    .map((from, fromIndex) => (
+                                                        <div
+                                                            key={from.id}
+                                                            className="glass-card rounded-xl p-3"
+                                                        >
+                                                            <div className="flex items-center gap-2 mb-2">
+                                                                {from.imageUrl ? (
+                                                                    <Image
+                                                                        src={from.imageUrl}
+                                                                        alt={from.displayName}
+                                                                        width={20}
+                                                                        height={20}
+                                                                        className="rounded-full"
+                                                                    />
+                                                                ) : (
+                                                                    <div className={cn(
+                                                                        "w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold",
+                                                                        PLAYER_ACCENTS[(index + fromIndex + 1) % PLAYER_ACCENTS.length]
+                                                                    )}>
+                                                                        {from.displayName.charAt(0)}
+                                                                    </div>
+                                                                )}
+                                                                <span className="text-sm font-medium truncate">
+                                                                    {from.displayName}
+                                                                </span>
+                                                            </div>
+                                                            <div className="space-y-2">
+                                                                {[1, ...(partnerEnabled[from.id] ? [2] : [])].map((cmd) => {
+                                                                    const damage = getCommanderDamage(from.id, player.id, cmd);
+                                                                    return (
+                                                                        <div key={cmd} className="flex items-center justify-between">
+                                                                            <span className="text-xs text-muted-foreground">
+                                                                                Cmdr {cmd}
+                                                                            </span>
+                                                                            <div className="flex items-center gap-2">
+                                                                                <button
+                                                                                    onClick={() => changeCommanderDamage(from.id, player.id, cmd, -1)}
+                                                                                    disabled={!isConnected || damage === 0}
+                                                                                    className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 text-sm font-medium disabled:opacity-30 transition-all"
+                                                                                >
+                                                                                    -
+                                                                                </button>
+                                                                                <span className={cn(
+                                                                                    "w-8 text-center font-bold tabular-nums",
+                                                                                    damage >= 21 && "text-red-400",
+                                                                                    damage >= 15 && damage < 21 && "text-orange-400"
+                                                                                )}>
+                                                                                    {damage}
+                                                                                </span>
+                                                                                <button
+                                                                                    onClick={() => changeCommanderDamage(from.id, player.id, cmd, +1)}
+                                                                                    disabled={!isConnected}
+                                                                                    className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 text-sm font-medium disabled:opacity-30 transition-all"
+                                                                                >
+                                                                                    +
+                                                                                </button>
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })}
                                                             </div>
                                                         </div>
                                                     ))}
-                                                </div>
-                                            ))}
-                                    </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
-                            ) : null}
-                        </CardContent>
-                    </Card>
-                ))}
+                            );
+                        })}
+                    </div>
+                )}
             </div>
         </div>
     );
 }
-
-
