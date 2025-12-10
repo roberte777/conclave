@@ -323,3 +323,75 @@
 .focus-ring {
   @apply outline-none ring-2 ring-primary ring-offset-2 ring-offset-background;
 }
+
+/* Responsive life total text sizes */
+.life-text-xl {
+  font-size: clamp(3rem, 10vw, 6rem);
+}
+
+.life-text-lg {
+  font-size: clamp(2.5rem, 8vw, 5rem);
+}
+
+.life-text-md {
+  font-size: clamp(2rem, 6vw, 4rem);
+}
+
+.life-text-sm {
+  font-size: clamp(1.75rem, 5vw, 3rem);
+}
+
+/* Player panel styles */
+.player-panel {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (hover: hover) {
+  .player-panel:hover {
+    transform: scale(1.01);
+  }
+}
+
+/* Touch device optimizations */
+@media (pointer: coarse) {
+  .life-button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* Prevent text selection on buttons for better touch experience */
+.life-button {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Press and hold visual feedback */
+.life-button:active {
+  transform: scale(0.92);
+}
+
+/* Safe area insets for mobile devices with notches */
+@supports (padding: max(0px)) {
+  .safe-area-padding {
+    padding-left: max(0.5rem, env(safe-area-inset-left));
+    padding-right: max(0.5rem, env(safe-area-inset-right));
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+  }
+}
+
+/* Game grid - ensure content fits viewport */
+.game-grid-container {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - var(--header-height, 56px));
+  min-height: calc(100dvh - var(--header-height, 56px));
+}
+
+/* Ensure game panels fill available space on mobile */
+@media (max-width: 768px) {
+  .player-panel {
+    min-height: 0;
+  }
+}
