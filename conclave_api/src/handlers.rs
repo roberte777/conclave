@@ -51,13 +51,8 @@ pub async fn create_game(
         ));
     }
 
-    let game = database::create_game(
-        &state.db,
-        &request.name,
-        starting_life,
-        &auth.clerk_user_id,
-    )
-    .await?;
+    let game =
+        database::create_game(&state.db, &request.name, starting_life, &auth.clerk_user_id).await?;
 
     // Initialize WebSocket room for the new game
     state.get_or_create_game_room(game.id);
@@ -71,7 +66,12 @@ pub async fn join_game(
     Path(game_id): Path<Uuid>,
     auth: AuthenticatedUser,
 ) -> Result<Json<PlayerWithUser>> {
-    info!("User {} ({}) joining game {}", auth.clerk_user_id, auth.user.display_name(), game_id);
+    info!(
+        "User {} ({}) joining game {}",
+        auth.clerk_user_id,
+        auth.user.display_name(),
+        game_id
+    );
 
     let player = database::join_game(&state.db, game_id, &auth.clerk_user_id).await?;
 
@@ -100,7 +100,18 @@ pub async fn leave_game(
 ) -> Result<StatusCode> {
     info!("User {} leaving game {}", auth.clerk_user_id, game_id);
 
+    // Get player info before removing them (needed for broadcast)
+    let players = database::get_players_in_game(&state.db, game_id).await?;
+    let player = players
+        .iter()
+        .find(|p| p.clerk_user_id == auth.clerk_user_id)
+        .ok_or(ApiError::PlayerNotFound)?;
+    let player_id = player.id;
+
     database::leave_game(&state.db, game_id, &auth.clerk_user_id).await?;
+
+    // Broadcast player left event to WebSocket clients
+    websocket::broadcast_player_left(&state, game_id, player_id).await;
 
     info!(
         "User {} successfully left game {}",
@@ -220,7 +231,10 @@ pub async fn end_game(
     };
 
     // Broadcast game ended event with enriched winner
-    let message = WebSocketMessage::GameEnded { game_id, winner: enriched_winner };
+    let message = WebSocketMessage::GameEnded {
+        game_id,
+        winner: enriched_winner,
+    };
     state.broadcast_to_game(game_id, message);
 
     // Clean up WebSocket room

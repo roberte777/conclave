@@ -192,11 +192,10 @@ impl ClerkClient {
             .ok_or_else(|| ApiError::Unauthorized("Token missing key ID".to_string()))?;
 
         // Check cache first
-        let cached_key = None;
-        // let cached_key = {
-        //     let cache = self.jwks_cache.read().await;
-        //     cache.get(&kid).cloned()
-        // };
+        let cached_key = {
+            let cache = self.jwks_cache.read().await;
+            cache.get(&kid).cloned()
+        };
 
         let decoding_key = match cached_key {
             Some(key) => key,
