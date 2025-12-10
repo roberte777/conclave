@@ -1,3 +1,6 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import { SignInButton } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,6 +17,12 @@ import {
 } from "lucide-react";
 
 export function LandingPage() {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   return (
     <div className="min-h-screen bg-gradient-mesh overflow-hidden">
       {/* Hero Section */}
@@ -27,7 +36,7 @@ export function LandingPage() {
 
         <div className="max-w-6xl mx-auto relative">
           {/* Badge */}
-          <div className="flex justify-center mb-8 animate-fade-in-up">
+          <div className={`flex justify-center mb-8 transition-all duration-500 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
             <div className="glass-card rounded-full px-4 py-2 flex items-center gap-2 text-sm">
               <Sparkles className="w-4 h-4 text-violet-400" />
               <span className="text-muted-foreground">Real-time multiplayer life tracking</span>
@@ -35,14 +44,14 @@ export function LandingPage() {
           </div>
 
           {/* Main Headline */}
-          <h1 className="text-5xl md:text-7xl lg:text-8xl font-black text-center mb-6 animate-fade-in-up" style={{ animationDelay: "0.1s" }}>
+          <h1 className={`text-5xl md:text-7xl lg:text-8xl font-black text-center mb-6 transition-all duration-500 delay-100 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
             <span className="bg-gradient-to-r from-violet-400 via-purple-400 to-pink-400 bg-clip-text text-transparent animate-gradient">
               Conclave
             </span>
           </h1>
 
           {/* Subheadline */}
-          <p className="text-xl md:text-2xl text-center text-muted-foreground max-w-3xl mx-auto mb-10 animate-fade-in-up" style={{ animationDelay: "0.2s" }}>
+          <p className={`text-xl md:text-2xl text-center text-muted-foreground max-w-3xl mx-auto mb-10 transition-all duration-500 delay-200 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
             The ultimate life tracker for Magic: The Gathering.
             <span className="block mt-2 text-foreground/80">
               Track life, commander damage, and win in style.
@@ -50,7 +59,7 @@ export function LandingPage() {
           </p>
 
           {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-20 animate-fade-in-up" style={{ animationDelay: "0.3s" }}>
+          <div className={`flex flex-col sm:flex-row gap-4 justify-center items-center mb-20 transition-all duration-500 delay-300 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
             <SignInButton mode="modal">
               <Button size="lg" className="h-14 px-8 text-lg font-semibold bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 shadow-lg shadow-violet-500/25 transition-all hover:shadow-xl hover:shadow-violet-500/30 hover:scale-105">
                 Get Started Free
@@ -65,7 +74,7 @@ export function LandingPage() {
           </div>
 
           {/* Hero Visual - Life Counter Preview */}
-          <div className="relative animate-fade-in-up" style={{ animationDelay: "0.4s" }}>
+          <div className={`relative transition-all duration-500 delay-[400ms] ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
             <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent z-10 pointer-events-none" />
             <div className="glass-card rounded-3xl p-6 md:p-8 max-w-4xl mx-auto overflow-hidden">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -78,8 +87,12 @@ export function LandingPage() {
                 ].map((player, i) => (
                   <div
                     key={i}
-                    className={`bg-gradient-to-br ${player.color} rounded-2xl border p-4 md:p-6 text-center backdrop-blur-xl animate-fade-in-up`}
-                    style={{ animationDelay: `${0.5 + i * 0.1}s` }}
+                    className={`bg-gradient-to-br ${player.color} rounded-2xl border p-4 md:p-6 text-center backdrop-blur-xl transition-all duration-500`}
+                    style={{
+                      transitionDelay: `${500 + i * 100}ms`,
+                      opacity: mounted ? 1 : 0,
+                      transform: mounted ? "translateY(0)" : "translateY(16px)"
+                    }}
                   >
                     <div className="text-sm text-muted-foreground mb-2">{player.name}</div>
                     <div className="text-4xl md:text-5xl font-black">{player.life}</div>
