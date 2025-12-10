@@ -251,9 +251,12 @@ async fn handle_websocket_message(text: &str, game_id: Uuid, state: &AppState) -
             debug!("WebSocket GetGameState: game_id={}", game_id);
             handle_get_game_state(game_id, state).await
         }
-        WebSocketRequest::EndGame => {
-            debug!("WebSocket EndGame: game_id={}", game_id);
-            handle_end_game(game_id, state).await
+        WebSocketRequest::EndGame { winner_player_id } => {
+            debug!(
+                "WebSocket EndGame: game_id={}, winner={:?}",
+                game_id, winner_player_id
+            );
+            handle_end_game(game_id, winner_player_id, state).await
         }
         WebSocketRequest::SetCommanderDamage {
             from_player_id,
@@ -425,19 +428,33 @@ async fn handle_get_game_state(game_id: Uuid, state: &AppState) -> Result<()> {
     Ok(())
 }
 
-async fn handle_end_game(game_id: Uuid, state: &AppState) -> Result<()> {
-    info!("Ending game {} via WebSocket request", game_id);
+async fn handle_end_game(
+    game_id: Uuid,
+    winner_player_id: Option<Uuid>,
+    state: &AppState,
+) -> Result<()> {
+    info!(
+        "Ending game {} via WebSocket request with winner: {:?}",
+        game_id, winner_player_id
+    );
 
-    // End the game in the database
-    let _ = database::end_game(&state.db, game_id).await?;
+    // End the game in the database with the specified winner
+    let _ = database::end_game(&state.db, game_id, winner_player_id).await?;
 
-    // Get all players to determine winner (player with highest life)
-    let players = database::get_players_in_game(&state.db, game_id).await?;
-    let winner = players.iter().max_by_key(|p| p.current_life).cloned();
+    // Get the winner player if specified
+    let enriched_winner = if let Some(winner_id) = winner_player_id {
+        let players = database::get_players_in_game(&state.db, game_id).await?;
+        players
+            .into_iter()
+            .find(|p| p.id == winner_id)
+            .map(|w| database::enrich_player_with_user(w))
+    } else {
+        None
+    };
 
-    // Enrich winner with user info
-    let enriched_winner = if let Some(w) = winner {
-        Some(database::enrich_player_with_user(w).await)
+    // Await the enrichment if there's a winner
+    let enriched_winner = if let Some(future) = enriched_winner {
+        Some(future.await)
     } else {
         None
     };

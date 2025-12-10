@@ -216,9 +216,10 @@ export class WebSocketClient {
     });
   }
 
-  endGame(): void {
+  endGame(winnerPlayerId?: string): void {
     this.send({
       action: "endGame",
+      winnerPlayerId,
     });
   }
 

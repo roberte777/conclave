@@ -27,7 +27,7 @@ public enum ClientMessage: Codable, Sendable {
     case updateLife(playerId: UUID, changeAmount: Int32)
     case leaveGame(playerId: UUID)
     case getGameState
-    case endGame
+    case endGame(winnerPlayerId: UUID?)
     case setCommanderDamage(
         fromPlayerId: UUID,
         toPlayerId: UUID,
@@ -46,6 +46,7 @@ public enum ClientMessage: Codable, Sendable {
         case action
         case playerId
         case changeAmount
+        case winnerPlayerId
         case fromPlayerId
         case toPlayerId
         case commanderNumber
@@ -72,7 +73,8 @@ public enum ClientMessage: Codable, Sendable {
         case "getGameState":
             self = .getGameState
         case "endGame":
-            self = .endGame
+            let winnerPlayerId = try container.decodeIfPresent(UUID.self, forKey: .winnerPlayerId)
+            self = .endGame(winnerPlayerId: winnerPlayerId)
         case "setCommanderDamage":
             let fromPlayerId = try container.decode(
                 UUID.self,
@@ -149,8 +151,9 @@ public enum ClientMessage: Codable, Sendable {
             try container.encode(playerId, forKey: .playerId)
         case .getGameState:
             try container.encode("getGameState", forKey: .action)
-        case .endGame:
+        case .endGame(let winnerPlayerId):
             try container.encode("endGame", forKey: .action)
+            try container.encodeIfPresent(winnerPlayerId, forKey: .winnerPlayerId)
         case .setCommanderDamage(
             let fromPlayerId,
             let toPlayerId,

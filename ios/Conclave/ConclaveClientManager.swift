@@ -364,7 +364,6 @@ public class ConclaveClientManager {
                 clerkUserId: oldPlayer.clerkUserId,
                 currentLife: message.newLife,
                 position: oldPlayer.position,
-                isEliminated: oldPlayer.isEliminated,
                 displayName: oldPlayer.displayName,
                 username: oldPlayer.username,
                 imageUrl: oldPlayer.imageUrl

@@ -83,8 +83,8 @@ public final class ConclaveAPIClientImpl: ConclaveClient, Sendable {
         try await httpClient.updateLife(gameId: gameId, request: request)
     }
 
-    public func endGame(gameId: UUID) async throws -> Game {
-        try await httpClient.endGame(gameId: gameId)
+    public func endGame(gameId: UUID, winnerPlayerId: UUID?) async throws -> Game {
+        try await httpClient.endGame(gameId: gameId, winnerPlayerId: winnerPlayerId)
     }
 
     public func getRecentLifeChanges(gameId: UUID) async throws -> [LifeChange]
@@ -160,8 +160,8 @@ public final class ConclaveAPIClientImpl: ConclaveClient, Sendable {
         try await webSocketClient.getGameState()
     }
 
-    public func endGame() async throws {
-        try await webSocketClient.endGame()
+    public func endGame(winnerPlayerId: UUID?) async throws {
+        try await webSocketClient.endGame(winnerPlayerId: winnerPlayerId)
     }
 
     // MARK: - Commander Damage WebSocket Implementation

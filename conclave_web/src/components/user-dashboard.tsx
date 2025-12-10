@@ -37,7 +37,6 @@ export function UserDashboard() {
   const [availableGames, setAvailableGames] = useState<GameWithUsers[]>([]);
   const [loadingGames, setLoadingGames] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [gameName, setGameName] = useState("");
   const [startingLifeInput, setStartingLifeInput] = useState(String(DEFAULT_STARTING_LIFE));
   const [startingLifeError, setStartingLifeError] = useState<string | null>(null);
   const [leavingGameId, setLeavingGameId] = useState<string | null>(null);
@@ -76,7 +75,7 @@ export function UserDashboard() {
   }, [refreshGames]);
 
   const handleCreateGame = async () => {
-    if (!user?.id || !gameName.trim()) return;
+    if (!user?.id) return;
     setStartingLifeError(null);
 
     const parsedLife = parseInt(startingLifeInput, 10);
@@ -88,12 +87,10 @@ export function UserDashboard() {
     setCreatingGame(true);
     try {
       const game = await api.http.createGame({
-        name: gameName,
         startingLife: parsedLife,
       });
 
       setShowCreateDialog(false);
-      setGameName("");
       setStartingLifeInput(String(DEFAULT_STARTING_LIFE));
       setStartingLifeError(null);
       window.location.href = `/game/${game.id}`;
@@ -105,7 +102,6 @@ export function UserDashboard() {
   };
 
   const openCreateDialog = () => {
-    setGameName(`${user?.firstName || user?.username || "Player"}'s Game`);
     setStartingLifeInput(String(DEFAULT_STARTING_LIFE));
     setStartingLifeError(null);
     setShowCreateDialog(true);
@@ -243,7 +239,7 @@ export function UserDashboard() {
                 >
                   <div className="flex items-start justify-between gap-4 mb-4">
                     <div>
-                      <h3 className="text-lg font-semibold mb-1">{g.game.name}</h3>
+                      <h3 className="text-lg font-semibold mb-1">Game #{g.game.id.slice(0, 8)}</h3>
                       <div className="flex items-center gap-3 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <Users className="w-4 h-4" />
@@ -359,7 +355,7 @@ export function UserDashboard() {
                   style={{ animationDelay: `${0.1 * i}s` }}
                 >
                   <div className={myActiveGames.length > 0 ? "" : "mb-4"}>
-                    <h3 className="text-lg font-semibold mb-1">{gameWithUsers.game.name}</h3>
+                    <h3 className="text-lg font-semibold mb-1">Game #{gameWithUsers.game.id.slice(0, 8)}</h3>
                     <div className="flex items-center gap-3 text-sm text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <Users className="w-4 h-4" />
@@ -417,21 +413,10 @@ export function UserDashboard() {
           <DialogHeader>
             <DialogTitle className="text-xl">Create New Game</DialogTitle>
             <DialogDescription>
-              Set up your Commander session. Customize the game name and starting life.
+              Set up your Commander session with your preferred starting life total.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-6 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="name" className="text-sm font-medium">
-                Game Name
-              </Label>
-              <Input
-                id="name"
-                value={gameName}
-                onChange={(e) => setGameName(e.target.value)}
-                placeholder="Enter game name"
-              />
-            </div>
             <div className="space-y-2">
               <Label htmlFor="life" className="text-sm font-medium">
                 Starting Life
@@ -462,7 +447,7 @@ export function UserDashboard() {
             </Button>
             <Button
               onClick={handleCreateGame}
-              disabled={creatingGame || !gameName.trim()}
+              disabled={creatingGame}
               className="bg-gradient-to-r from-violet-600 to-purple-600"
             >
               {creatingGame ? (

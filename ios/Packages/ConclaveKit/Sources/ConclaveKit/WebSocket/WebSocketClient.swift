@@ -401,8 +401,8 @@ public final class WebSocketClient: ConclaveWebSocketClient, Sendable {
         try await sendMessage(message)
     }
 
-    public func endGame() async throws {
-        let message = ClientMessage.endGame
+    public func endGame(winnerPlayerId: UUID? = nil) async throws {
+        let message = ClientMessage.endGame(winnerPlayerId: winnerPlayerId)
         try await sendMessage(message)
     }
 

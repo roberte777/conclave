@@ -24,7 +24,7 @@ public protocol ConclaveAPIClient: Sendable {
     func leaveGame(gameId: UUID) async throws
     func updateLife(gameId: UUID, request: UpdateLifeRequest) async throws
         -> Player
-    func endGame(gameId: UUID) async throws -> Game
+    func endGame(gameId: UUID, winnerPlayerId: UUID?) async throws -> Game
     func getRecentLifeChanges(gameId: UUID) async throws -> [LifeChange]
 
     // MARK: - Commander Damage Endpoints
@@ -54,7 +54,7 @@ public protocol ConclaveWebSocketClient: Sendable {
     func updateLife(playerId: UUID, changeAmount: Int32) async throws
     func leaveGame(playerId: UUID) async throws
     func getGameState() async throws
-    func endGame() async throws
+    func endGame(winnerPlayerId: UUID?) async throws
 
     // MARK: - Commander Damage WebSocket Methods
     func setCommanderDamage(

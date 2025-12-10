@@ -95,8 +95,7 @@ struct GameSettingsView: View {
             gameId: mockGame.id,
             clerkUserId: "preview_user",
             currentLife: 40,
-            position: 1,
-            isEliminated: false
+            position: 1
         )
 
         manager.currentGame = mockGame
