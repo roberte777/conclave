@@ -521,7 +521,11 @@ pub async fn end_game(
     get_game_by_id(pool, game_id).await
 }
 
-pub async fn get_user_game_history(pool: &SqlitePool, clerk_user_id: &str, pod_filter: Option<Vec<String>>) -> Result<GameHistory> {
+pub async fn get_user_game_history(
+    pool: &SqlitePool,
+    clerk_user_id: &str,
+    pod_filter: Option<Vec<String>>,
+) -> Result<GameHistory> {
     // If pod_filter is provided, we need to find games where ALL the specified users participated
     let rows = if let Some(ref pod_users) = pod_filter {
         // Build a query that finds games where all specified users are players
@@ -532,23 +536,23 @@ pub async fn get_user_game_history(pool: &SqlitePool, clerk_user_id: &str, pod_f
             FROM games g
             INNER JOIN players p ON g.id = p.game_id
             WHERE p.clerk_user_id = ? AND g.status = 'finished'
-            "#
+            "#,
         );
-        
+
         // For each additional user in the pod, ensure they were also in the game
         for _ in 1..pod_users.len() {
             query.push_str(" AND g.id IN (SELECT game_id FROM players WHERE clerk_user_id = ?)");
         }
-        
+
         query.push_str(" ORDER BY g.finished_at DESC");
-        
+
         let mut sql_query = sqlx::query(&query).bind(clerk_user_id);
-        
+
         // Bind all the pod user IDs
         for user_id in pod_users.iter().skip(1) {
             sql_query = sql_query.bind(user_id);
         }
-        
+
         sql_query.fetch_all(pool).await?
     } else {
         // No pod filter - return all games for this user
