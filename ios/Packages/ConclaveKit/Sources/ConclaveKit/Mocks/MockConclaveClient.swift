@@ -144,7 +144,6 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
                 clerkUserId: oldPlayer.clerkUserId,
                 currentLife: newLife,
                 position: oldPlayer.position,
-                isEliminated: newLife <= 0,
                 displayName: oldPlayer.displayName,
                 username: oldPlayer.username,
                 imageUrl: oldPlayer.imageUrl
@@ -276,7 +275,6 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
                     clerkUserId: j == 0 ? clerkUserId : "mock_opponent_\(j)",
                     currentLife: Int32.random(in: 0...40),
                     position: Int32(j + 1),
-                    isEliminated: false,
                     displayName: j == 0 ? "You" : "Opponent \(j)"
                 )
             }
@@ -433,7 +431,6 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
             clerkUserId: clerkUserId,
             currentLife: game.startingLife,
             position: 1,
-            isEliminated: false,
             displayName: "You"
         )
 
@@ -511,7 +508,6 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
             clerkUserId: clerkUserId,
             currentLife: game.startingLife,
             position: position,
-            isEliminated: false,
             displayName: "You"
         )
 
@@ -578,7 +574,7 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
         return updatedPlayer
     }
 
-    public func endGame(gameId: UUID) async throws -> Game {
+    public func endGame(gameId: UUID, winnerPlayerId: UUID?) async throws -> Game {
         await simulateNetworkDelay()
 
         if shouldSimulateError() {
@@ -592,7 +588,9 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
         // Broadcast game ended via WebSocket
         if await mockState.isConnected() {
             let players = await mockState.getPlayers(gameId)
-            let winner = players.max(by: { $0.currentLife < $1.currentLife })
+            let winner = winnerPlayerId.flatMap { winnerId in
+                players.first(where: { $0.id == winnerId })
+            }
             let message = GameEndedMessage(gameId: gameId, winner: winner)
             await mockState.broadcastMessage(.gameEnded(message))
         }
@@ -718,8 +716,8 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
             try await handleMockLeaveGame(gameId: gameId, playerId: playerId)
         case .getGameState:
             try await handleMockGetGameState(gameId: gameId)
-        case .endGame:
-            try await handleMockEndGame(gameId: gameId)
+        case .endGame(let winnerPlayerId):
+            try await handleMockEndGame(gameId: gameId, winnerPlayerId: winnerPlayerId)
         case .setCommanderDamage(
             let fromPlayerId,
             let toPlayerId,
@@ -773,8 +771,8 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
         try await sendMessage(message)
     }
 
-    public func endGame() async throws {
-        let message = ClientMessage.endGame
+    public func endGame(winnerPlayerId: UUID?) async throws {
+        let message = ClientMessage.endGame(winnerPlayerId: winnerPlayerId)
         try await sendMessage(message)
     }
 
@@ -877,8 +875,8 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
         await mockState.broadcastMessage(.gameStarted(message))
     }
 
-    private func handleMockEndGame(gameId: UUID) async throws {
-        _ = try await endGame(gameId: gameId)
+    private func handleMockEndGame(gameId: UUID, winnerPlayerId: UUID?) async throws {
+        _ = try await endGame(gameId: gameId, winnerPlayerId: winnerPlayerId)
     }
 
     private func handleMockSetCommanderDamage(

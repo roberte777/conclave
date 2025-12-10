@@ -189,10 +189,12 @@ public final class HTTPClient: ConclaveAPIClient, Sendable {
         )
     }
 
-    public func endGame(gameId: UUID) async throws -> Game {
-        try await performRequest(
+    public func endGame(gameId: UUID, winnerPlayerId: UUID?) async throws -> Game {
+        let request = EndGameRequest(winnerPlayerId: winnerPlayerId)
+        return try await performRequest(
             path: "/games/\(gameId.uuidString)/end",
             method: .PUT,
+            body: request,
             requiresAuth: true
         )
     }

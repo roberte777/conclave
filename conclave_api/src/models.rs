@@ -7,9 +7,9 @@ use uuid::Uuid;
 #[serde(rename_all = "camelCase")]
 pub struct Game {
     pub id: Uuid,
-    pub name: String,
     pub status: String, // "active", "finished"
     pub starting_life: i32,
+    pub winner_player_id: Option<Uuid>, // Optional winner reference
     pub created_at: DateTime<Utc>,
     pub finished_at: Option<DateTime<Utc>>,
 }
@@ -22,7 +22,6 @@ pub struct Player {
     pub clerk_user_id: String, // Clerk user ID
     pub current_life: i32,
     pub position: i32, // Player position in game (1-8 for MTG)
-    pub is_eliminated: bool,
 }
 
 /// Player with enriched user display info from Clerk
@@ -34,7 +33,6 @@ pub struct PlayerWithUser {
     pub clerk_user_id: String,
     pub current_life: i32,
     pub position: i32,
-    pub is_eliminated: bool,
     // User display info
     pub display_name: String,
     pub username: Option<String>,
@@ -42,14 +40,18 @@ pub struct PlayerWithUser {
 }
 
 impl PlayerWithUser {
-    pub fn from_player(player: Player, display_name: String, username: Option<String>, image_url: Option<String>) -> Self {
+    pub fn from_player(
+        player: Player,
+        display_name: String,
+        username: Option<String>,
+        image_url: Option<String>,
+    ) -> Self {
         Self {
             id: player.id,
             game_id: player.game_id,
             clerk_user_id: player.clerk_user_id,
             current_life: player.current_life,
             position: player.position,
-            is_eliminated: player.is_eliminated,
             display_name,
             username,
             image_url,
@@ -85,9 +87,8 @@ pub struct CommanderDamage {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateGameRequest {
-    pub name: String,
     pub starting_life: Option<i32>, // Default to 20 if not provided
-    // clerk_user_id is now extracted from JWT token
+                                    // clerk_user_id is now extracted from JWT token
 }
 
 // JoinGameRequest is no longer needed - clerk_user_id comes from JWT
@@ -113,6 +114,12 @@ pub struct UpdateCommanderDamageRequest {
 pub struct TogglePartnerRequest {
     pub player_id: Uuid,
     pub enable_partner: bool,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EndGameRequest {
+    pub winner_player_id: Option<Uuid>, // Optional winner
 }
 
 // Helper struct for representing user info from Clerk
@@ -223,7 +230,9 @@ pub enum WebSocketRequest {
         player_id: Uuid,
     },
     GetGameState,
-    EndGame,
+    EndGame {
+        winner_player_id: Option<Uuid>,
+    },
     SetCommanderDamage {
         from_player_id: Uuid,
         to_player_id: Uuid,

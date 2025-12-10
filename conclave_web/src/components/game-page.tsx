@@ -3,6 +3,15 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import { ConclaveAPI, type GameState, type Player } from "@/lib/api";
 import Image from "next/image";
 import Link from "next/link";
@@ -63,6 +72,8 @@ export function GamePageClient({ gameId }: GamePageClientProps) {
     const [winner, setWinner] = useState<Player | null>(null);
     const [expandedPlayer, setExpandedPlayer] = useState<string | null>(null);
     const [animatingLife, setAnimatingLife] = useState<Record<string, boolean>>({});
+    const [showEndGameDialog, setShowEndGameDialog] = useState(false);
+    const [selectedWinnerId, setSelectedWinnerId] = useState<string | null>(null);
 
     // Establish websocket connection and wire up handlers
     useEffect(() => {
@@ -212,8 +223,14 @@ export function GamePageClient({ gameId }: GamePageClientProps) {
     );
 
     const endGame = useCallback(() => {
-        api.ws?.endGame();
-    }, [api]);
+        setShowEndGameDialog(true);
+    }, []);
+
+    const confirmEndGame = useCallback(() => {
+        api.ws?.endGame(selectedWinnerId || undefined);
+        setShowEndGameDialog(false);
+        setSelectedWinnerId(null);
+    }, [api, selectedWinnerId]);
 
     const getCommanderDamage = useCallback(
         (fromId: string, toId: string, commanderNumber: number) => {
@@ -296,7 +313,7 @@ export function GamePageClient({ gameId }: GamePageClientProps) {
                         </Link>
                         <div>
                             <h1 className="text-lg font-bold flex items-center gap-2">
-                                {state?.game.name || "Loading..."}
+                                Game #{gameId.slice(0, 8)}
                                 {winner && (
                                     <span className="text-xs px-2 py-1 rounded-full bg-amber-500/20 text-amber-400 font-medium">
                                         Finished
@@ -607,6 +624,60 @@ export function GamePageClient({ gameId }: GamePageClientProps) {
                     </div>
                 )}
             </div>
+
+            {/* End Game Dialog */}
+            <Dialog open={showEndGameDialog} onOpenChange={setShowEndGameDialog}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>End Game</DialogTitle>
+                        <DialogDescription>
+                            Select the winner of this game, or choose &quot;No winner&quot; if the game was not completed.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                        <div className="space-y-2">
+                            <Button
+                                variant={selectedWinnerId === null ? "default" : "outline"}
+                                className="w-full justify-start"
+                                onClick={() => setSelectedWinnerId(null)}
+                            >
+                                No winner (game not completed)
+                            </Button>
+                            {(state?.players || []).map((player) => (
+                                <Button
+                                    key={player.id}
+                                    variant={selectedWinnerId === player.id ? "default" : "outline"}
+                                    className="w-full justify-start"
+                                    onClick={() => setSelectedWinnerId(player.id)}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        {player.imageUrl && (
+                                            <Image
+                                                src={player.imageUrl}
+                                                alt={player.displayName}
+                                                width={20}
+                                                height={20}
+                                                className="rounded-full"
+                                            />
+                                        )}
+                                        <span>
+                                            P{player.position}: {player.displayName} ({player.currentLife} life)
+                                        </span>
+                                    </div>
+                                </Button>
+                            ))}
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowEndGameDialog(false)}>
+                            Cancel
+                        </Button>
+                        <Button variant="destructive" onClick={confirmEndGame}>
+                            End Game
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

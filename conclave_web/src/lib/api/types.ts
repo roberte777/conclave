@@ -1,8 +1,8 @@
 export interface Game {
   id: string;
-  name: string;
   status: "active" | "finished";
   startingLife: number;
+  winnerPlayerId?: string;
   createdAt: string;
   finishedAt?: string;
 }
@@ -13,7 +13,6 @@ export interface Player {
   clerkUserId: string;
   currentLife: number;
   position: number;
-  isEliminated: boolean;
   // User display info (enriched from backend)
   displayName: string;
   username?: string;
@@ -71,7 +70,6 @@ export interface GameEndResult {
 }
 
 export interface CreateGameRequest {
-  name: string;
   startingLife?: number;
   // clerkUserId is now extracted from JWT token
 }
@@ -95,92 +93,97 @@ export interface TogglePartnerRequest {
   enablePartner: boolean;
 }
 
+export interface EndGameRequest {
+  winnerPlayerId?: string;
+}
+
 export type WebSocketMessage =
   | {
-      type: "lifeUpdate";
-      gameId: string;
-      playerId: string;
-      newLife: number;
-      changeAmount: number;
-    }
+    type: "lifeUpdate";
+    gameId: string;
+    playerId: string;
+    newLife: number;
+    changeAmount: number;
+  }
   | {
-      type: "playerJoined";
-      gameId: string;
-      player: Player;
-    }
+    type: "playerJoined";
+    gameId: string;
+    player: Player;
+  }
   | {
-      type: "playerLeft";
-      gameId: string;
-      playerId: string;
-    }
+    type: "playerLeft";
+    gameId: string;
+    playerId: string;
+  }
   | {
-      type: "gameStarted";
-      game: Game;
-      players: Player[];
-      recentChanges: LifeChange[];
-      commanderDamage: CommanderDamage[];
-    }
+    type: "gameStarted";
+    game: Game;
+    players: Player[];
+    recentChanges: LifeChange[];
+    commanderDamage: CommanderDamage[];
+  }
   | {
-      type: "gameEnded";
-      gameId: string;
-      winner?: Player;
-    }
+    type: "gameEnded";
+    gameId: string;
+    winner?: Player;
+  }
   | {
-      type: "commanderDamageUpdate";
-      gameId: string;
-      fromPlayerId: string;
-      toPlayerId: string;
-      commanderNumber: number;
-      newDamage: number;
-      damageAmount: number;
-    }
+    type: "commanderDamageUpdate";
+    gameId: string;
+    fromPlayerId: string;
+    toPlayerId: string;
+    commanderNumber: number;
+    newDamage: number;
+    damageAmount: number;
+  }
   | {
-      type: "partnerToggled";
-      gameId: string;
-      playerId: string;
-      hasPartner: boolean;
-    }
+    type: "partnerToggled";
+    gameId: string;
+    playerId: string;
+    hasPartner: boolean;
+  }
   | {
-      type: "error";
-      message: string;
-    };
+    type: "error";
+    message: string;
+  };
 
 export type WebSocketRequest =
   | {
-      action: "updateLife";
-      playerId: string;
-      changeAmount: number;
-    }
+    action: "updateLife";
+    playerId: string;
+    changeAmount: number;
+  }
   // joinGame action removed - auto-join happens on WebSocket connection with JWT
   | {
-      action: "leaveGame";
-      playerId: string;
-    }
+    action: "leaveGame";
+    playerId: string;
+  }
   | {
-      action: "getGameState";
-    }
+    action: "getGameState";
+  }
   | {
-      action: "endGame";
-    }
+    action: "endGame";
+    winnerPlayerId?: string;
+  }
   | {
-      action: "setCommanderDamage";
-      fromPlayerId: string;
-      toPlayerId: string;
-      commanderNumber: number;
-      newDamage: number;
-    }
+    action: "setCommanderDamage";
+    fromPlayerId: string;
+    toPlayerId: string;
+    commanderNumber: number;
+    newDamage: number;
+  }
   | {
-      action: "updateCommanderDamage";
-      fromPlayerId: string;
-      toPlayerId: string;
-      commanderNumber: number;
-      damageAmount: number;
-    }
+    action: "updateCommanderDamage";
+    fromPlayerId: string;
+    toPlayerId: string;
+    commanderNumber: number;
+    damageAmount: number;
+  }
   | {
-      action: "togglePartner";
-      playerId: string;
-      enablePartner: boolean;
-    };
+    action: "togglePartner";
+    playerId: string;
+    enablePartner: boolean;
+  };
 
 export const DEFAULT_STARTING_LIFE = 20;
 export const MAX_PLAYERS_PER_GAME = 8;

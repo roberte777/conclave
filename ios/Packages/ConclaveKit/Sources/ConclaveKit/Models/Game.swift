@@ -5,6 +5,7 @@ public struct Game: Codable, Equatable, Identifiable, Sendable {
     public let name: String
     public let status: GameStatus
     public let startingLife: Int32
+    public let winnerPlayerId: UUID?
     public let createdAt: Date
     public let finishedAt: Date?
 
@@ -13,6 +14,7 @@ public struct Game: Codable, Equatable, Identifiable, Sendable {
         name: String,
         status: GameStatus,
         startingLife: Int32,
+        winnerPlayerId: UUID? = nil,
         createdAt: Date,
         finishedAt: Date? = nil
     ) {
@@ -20,6 +22,7 @@ public struct Game: Codable, Equatable, Identifiable, Sendable {
         self.name = name
         self.status = status
         self.startingLife = startingLife
+        self.winnerPlayerId = winnerPlayerId
         self.createdAt = createdAt
         self.finishedAt = finishedAt
     }

@@ -124,9 +124,10 @@ export class HttpClient {
     });
   }
 
-  async endGame(gameId: string): Promise<Game> {
+  async endGame(gameId: string, request: { winnerPlayerId?: string }): Promise<Game> {
     return this.request<Game>(`/games/${gameId}/end`, {
       method: "PUT",
+      body: JSON.stringify(request),
     });
   }
 

@@ -268,11 +268,6 @@ struct ContentView: View {
                 }
 
                 Spacer()
-
-                if player.isEliminated {
-                    Text("💀")
-                        .font(.caption2)
-                }
             }
 
             // Life total

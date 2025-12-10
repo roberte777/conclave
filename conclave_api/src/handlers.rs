@@ -24,24 +24,11 @@ pub async fn create_game(
     Json(request): Json<CreateGameRequest>,
 ) -> Result<Json<Game>> {
     info!(
-        "Creating game: {} by user {} ({}) with starting life {}",
-        request.name,
+        "Creating game for user {} ({}), starting life: {}",
         auth.clerk_user_id,
         auth.user.display_name(),
         request.starting_life.unwrap_or(DEFAULT_STARTING_LIFE)
     );
-
-    if request.name.trim().is_empty() {
-        return Err(ApiError::BadRequest(
-            "Game name cannot be empty".to_string(),
-        ));
-    }
-
-    if request.name.len() > 100 {
-        return Err(ApiError::BadRequest(
-            "Game name too long (max 100 characters)".to_string(),
-        ));
-    }
 
     let starting_life = request.starting_life.unwrap_or(DEFAULT_STARTING_LIFE);
 
@@ -51,13 +38,12 @@ pub async fn create_game(
         ));
     }
 
-    let game =
-        database::create_game(&state.db, &request.name, starting_life, &auth.clerk_user_id).await?;
+    let game = database::create_game(&state.db, starting_life, &auth.clerk_user_id).await?;
 
     // Initialize WebSocket room for the new game
     state.get_or_create_game_room(game.id);
 
-    info!("Game created and started: {} ({})", game.name, game.id);
+    info!("Game created and started: {}", game.id);
     Ok(Json(game))
 }
 
@@ -214,18 +200,29 @@ pub async fn update_life(
 pub async fn end_game(
     State(state): State<AppState>,
     Path(game_id): Path<Uuid>,
+    Json(req): Json<EndGameRequest>,
 ) -> Result<Json<Game>> {
-    info!("Manually ending game {}", game_id);
+    info!(
+        "Manually ending game {} with winner: {:?}",
+        game_id, req.winner_player_id
+    );
 
-    let game = database::end_game(&state.db, game_id).await?;
+    let game = database::end_game(&state.db, game_id, req.winner_player_id).await?;
 
-    // Get all players to determine winner (player with highest life)
-    let players = database::get_players_in_game(&state.db, game_id).await?;
-    let winner = players.iter().max_by_key(|p| p.current_life).cloned();
+    // Get the winner player if specified
+    let enriched_winner = if let Some(winner_id) = req.winner_player_id {
+        let players = database::get_players_in_game(&state.db, game_id).await?;
+        players
+            .into_iter()
+            .find(|p| p.id == winner_id)
+            .map(|w| database::enrich_player_with_user(w))
+    } else {
+        None
+    };
 
-    // Enrich winner with user info
-    let enriched_winner = if let Some(w) = winner {
-        Some(database::enrich_player_with_user(w).await)
+    // Await the enrichment if there's a winner
+    let enriched_winner = if let Some(future) = enriched_winner {
+        Some(future.await)
     } else {
         None
     };
@@ -243,7 +240,7 @@ pub async fn end_game(
         state.cleanup_game_room(game_id);
     });
 
-    info!("Game ended: {} ({})", game.name, game.id);
+    info!("Game ended: {}", game.id);
     Ok(Json(game))
 }
 

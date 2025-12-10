@@ -6,8 +6,8 @@ use sqlx::{Row, Sqlite, SqlitePool, Transaction};
 use uuid::Uuid;
 
 pub async fn create_pool() -> Result<SqlitePool> {
-    let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "sqlite:conclave.db?mode=rwc".to_string());
+    let database_url =
+        std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite:conclave.db?mode=rwc".to_string());
     let pool = SqlitePool::connect(&database_url).await?;
     run_migrations(&pool).await?;
     Ok(pool)
@@ -26,59 +26,35 @@ async fn run_migrations(pool: &SqlitePool) -> Result<()> {
 // Game operations
 pub async fn create_game(
     pool: &SqlitePool,
-    name: &str,
     starting_life: i32,
     creator_clerk_user_id: &str,
 ) -> Result<Game> {
     let mut tx = pool.begin().await?;
-    // Check if game name already exists
-    let existing =
-        sqlx::query("SELECT COUNT(*) as count FROM games WHERE name = ? AND status != 'finished'")
-            .bind(name)
-            .fetch_one(pool)
-            .await?;
-
-    let count: i64 = existing.get("count");
-    if count > 0 {
-        return Err(ApiError::BadRequest("Game name already exists".to_string()));
-    }
 
     let game = Game {
         id: Uuid::new_v4(),
-        name: name.to_string(),
         status: "active".to_string(),
         starting_life,
+        winner_player_id: None,
         created_at: Utc::now(),
         finished_at: None,
     };
 
-    match sqlx::query(
-        "INSERT INTO games (id, name, status, starting_life, created_at) VALUES (?, ?, ?, ?, ?)",
+    sqlx::query(
+        "INSERT INTO games (id, status, starting_life, winner_player_id, created_at) VALUES (?, ?, ?, ?, ?)",
     )
     .bind(game.id.to_string())
-    .bind(&game.name)
     .bind(&game.status)
     .bind(game.starting_life)
+    .bind(game.winner_player_id.map(|id| id.to_string()))
     .bind(game.created_at.to_rfc3339())
     .execute(&mut *tx)
-    .await
-    {
-        Ok(_) => {
-            // Add the creator as the first player atomically
-            join_game_in_tx(&mut tx, game.id, creator_clerk_user_id).await?;
-            tx.commit().await?;
-            Ok(game)
-        }
-        Err(sqlx::Error::Database(db_err)) if db_err.code() == Some("2067".into()) => {
-            // SQLite unique constraint violation
-            tx.rollback().await?;
-            Err(ApiError::BadRequest("Game name already exists".to_string()))
-        }
-        Err(e) => {
-            tx.rollback().await?;
-            Err(ApiError::Database(e))
-        }
-    }
+    .await?;
+
+    // Add the creator as the first player atomically
+    join_game_in_tx(&mut tx, game.id, creator_clerk_user_id).await?;
+    tx.commit().await?;
+    Ok(game)
 }
 
 // Check if user is already in any active game
@@ -155,19 +131,17 @@ async fn join_game_in_tx(
         clerk_user_id: clerk_user_id.to_string(),
         current_life: game.starting_life,
         position,
-        is_eliminated: false,
     };
 
     // Database constraint will prevent duplicate positions
     sqlx::query(
-        "INSERT INTO players (id, game_id, clerk_user_id, current_life, position, is_eliminated) VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO players (id, game_id, clerk_user_id, current_life, position) VALUES (?, ?, ?, ?, ?)",
     )
     .bind(player.id.to_string())
     .bind(player.game_id.to_string())
     .bind(&player.clerk_user_id)
     .bind(player.current_life)
     .bind(player.position)
-    .bind(player.is_eliminated)
     .execute(&mut **tx)
     .await?;
 
@@ -246,9 +220,11 @@ async fn get_game_by_id_in_tx(tx: &mut Transaction<'_, Sqlite>, game_id: Uuid) -
     match row {
         Some(row) => Ok(Game {
             id: Uuid::parse_str(&row.get::<String, _>("id")).unwrap(),
-            name: row.get("name"),
             status: row.get("status"),
             starting_life: row.get("starting_life"),
+            winner_player_id: row
+                .get::<Option<String>, _>("winner_player_id")
+                .and_then(|s| Uuid::parse_str(&s).ok()),
             created_at: chrono::DateTime::parse_from_rfc3339(&row.get::<String, _>("created_at"))
                 .unwrap()
                 .with_timezone(&Utc),
@@ -271,9 +247,11 @@ pub async fn get_game_by_id(pool: &SqlitePool, game_id: Uuid) -> Result<Game> {
     match row {
         Some(row) => Ok(Game {
             id: Uuid::parse_str(&row.get::<String, _>("id")).unwrap(),
-            name: row.get("name"),
             status: row.get("status"),
             starting_life: row.get("starting_life"),
+            winner_player_id: row
+                .get::<Option<String>, _>("winner_player_id")
+                .and_then(|s| Uuid::parse_str(&s).ok()),
             created_at: chrono::DateTime::parse_from_rfc3339(&row.get::<String, _>("created_at"))
                 .unwrap()
                 .with_timezone(&Utc),
@@ -306,7 +284,6 @@ pub async fn get_players_in_game(pool: &SqlitePool, game_id: Uuid) -> Result<Vec
             clerk_user_id: row.get("clerk_user_id"),
             current_life: row.get("current_life"),
             position: row.get("position"),
-            is_eliminated: row.get("is_eliminated"),
         })
         .collect();
 
@@ -332,9 +309,11 @@ pub async fn get_user_games(pool: &SqlitePool, clerk_user_id: &str) -> Result<Ve
         let game_id = Uuid::parse_str(&row.get::<String, _>("id")).unwrap();
         let game = Game {
             id: game_id,
-            name: row.get("name"),
             status: row.get("status"),
             starting_life: row.get("starting_life"),
+            winner_player_id: row
+                .get::<Option<String>, _>("winner_player_id")
+                .and_then(|s| Uuid::parse_str(&s).ok()),
             created_at: chrono::DateTime::parse_from_rfc3339(&row.get::<String, _>("created_at"))
                 .unwrap()
                 .with_timezone(&Utc),
@@ -384,9 +363,11 @@ pub async fn get_all_games(pool: &SqlitePool) -> Result<Vec<GameWithUsers>> {
         let game_id = Uuid::parse_str(&row.get::<String, _>("id")).unwrap();
         let game = Game {
             id: game_id,
-            name: row.get("name"),
             status: row.get("status"),
             starting_life: row.get("starting_life"),
+            winner_player_id: row
+                .get::<Option<String>, _>("winner_player_id")
+                .and_then(|s| Uuid::parse_str(&s).ok()),
             created_at: chrono::DateTime::parse_from_rfc3339(&row.get::<String, _>("created_at"))
                 .unwrap()
                 .with_timezone(&Utc),
@@ -447,7 +428,6 @@ pub async fn update_player_life(
         clerk_user_id: player_row.get("clerk_user_id"),
         current_life: player_row.get("current_life"),
         position: player_row.get("position"),
-        is_eliminated: player_row.get("is_eliminated"),
     };
 
     // Record life change atomically
@@ -506,12 +486,37 @@ pub async fn get_recent_life_changes(
     Ok(changes)
 }
 
-pub async fn end_game(pool: &SqlitePool, game_id: Uuid) -> Result<Game> {
-    sqlx::query("UPDATE games SET status = 'finished', finished_at = ? WHERE id = ?")
-        .bind(Utc::now().to_rfc3339())
-        .bind(game_id.to_string())
-        .execute(pool)
-        .await?;
+pub async fn end_game(
+    pool: &SqlitePool,
+    game_id: Uuid,
+    winner_player_id: Option<Uuid>,
+) -> Result<Game> {
+    // Validate winner is in the game if provided
+    if let Some(winner_id) = winner_player_id {
+        let player_exists =
+            sqlx::query("SELECT COUNT(*) as count FROM players WHERE id = ? AND game_id = ?")
+                .bind(winner_id.to_string())
+                .bind(game_id.to_string())
+                .fetch_one(pool)
+                .await?
+                .get::<i64, _>("count")
+                > 0;
+
+        if !player_exists {
+            return Err(ApiError::BadRequest(
+                "Winner is not in this game".to_string(),
+            ));
+        }
+    }
+
+    sqlx::query(
+        "UPDATE games SET status = 'finished', finished_at = ?, winner_player_id = ? WHERE id = ?",
+    )
+    .bind(Utc::now().to_rfc3339())
+    .bind(winner_player_id.map(|id| id.to_string()))
+    .bind(game_id.to_string())
+    .execute(pool)
+    .await?;
 
     get_game_by_id(pool, game_id).await
 }
@@ -535,9 +540,11 @@ pub async fn get_user_game_history(pool: &SqlitePool, clerk_user_id: &str) -> Re
         let game_id = Uuid::parse_str(&row.get::<String, _>("id")).unwrap();
         let game = Game {
             id: game_id,
-            name: row.get("name"),
             status: row.get("status"),
             starting_life: row.get("starting_life"),
+            winner_player_id: row
+                .get::<Option<String>, _>("winner_player_id")
+                .and_then(|s| Uuid::parse_str(&s).ok()),
             created_at: chrono::DateTime::parse_from_rfc3339(&row.get::<String, _>("created_at"))
                 .unwrap()
                 .with_timezone(&Utc),
@@ -549,7 +556,13 @@ pub async fn get_user_game_history(pool: &SqlitePool, clerk_user_id: &str) -> Re
         };
 
         let players = get_players_in_game(pool, game_id).await?;
-        let winner = players.iter().max_by_key(|p| p.current_life).cloned();
+
+        // Get winner from the game's winner_player_id field
+        let winner = if let Some(winner_id) = game.winner_player_id {
+            players.iter().find(|p| p.id == winner_id).cloned()
+        } else {
+            None
+        };
 
         games.push(GameWithPlayers {
             game,
@@ -859,9 +872,11 @@ pub async fn get_available_games(
         let game_id = Uuid::parse_str(&row.get::<String, _>("id")).unwrap();
         let game = Game {
             id: game_id,
-            name: row.get("name"),
             status: row.get("status"),
             starting_life: row.get("starting_life"),
+            winner_player_id: row
+                .get::<Option<String>, _>("winner_player_id")
+                .and_then(|s| Uuid::parse_str(&s).ok()),
             created_at: chrono::DateTime::parse_from_rfc3339(&row.get::<String, _>("created_at"))
                 .unwrap()
                 .with_timezone(&Utc),
@@ -911,12 +926,7 @@ pub async fn enrich_player_with_user(player: Player) -> PlayerWithUser {
         }
     };
 
-    PlayerWithUser::from_player(
-        player,
-        user.display_name(),
-        user.username,
-        user.image_url,
-    )
+    PlayerWithUser::from_player(player, user.display_name(), user.username, user.image_url)
 }
 
 /// Enrich multiple players with user info from Clerk

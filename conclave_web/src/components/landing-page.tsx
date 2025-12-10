@@ -215,7 +215,7 @@ export function LandingPage() {
           <div className="glass-card rounded-3xl p-8 md:p-12 text-center relative overflow-hidden">
             {/* Background decoration */}
             <div className="absolute inset-0 bg-gradient-to-br from-violet-500/10 via-transparent to-pink-500/10 pointer-events-none" />
-            
+
             <div className="relative">
               <Shield className="w-16 h-16 mx-auto mb-6 text-violet-400" />
               <h2 className="text-3xl md:text-4xl font-bold mb-4">

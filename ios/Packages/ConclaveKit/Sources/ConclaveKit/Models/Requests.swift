@@ -43,3 +43,11 @@ public struct TogglePartnerRequest: Codable, Sendable {
         self.enablePartner = enablePartner
     }
 }
+
+public struct EndGameRequest: Codable, Sendable {
+    public let winnerPlayerId: UUID?
+
+    public init(winnerPlayerId: UUID? = nil) {
+        self.winnerPlayerId = winnerPlayerId
+    }
+}
