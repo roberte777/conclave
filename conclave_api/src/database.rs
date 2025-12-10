@@ -564,10 +564,18 @@ pub async fn get_user_game_history(pool: &SqlitePool, clerk_user_id: &str) -> Re
             None
         };
 
-        games.push(GameWithPlayers {
+        // Enrich players with user info from Clerk
+        let enriched_players = enrich_players_with_users(players).await;
+        let enriched_winner = if let Some(w) = winner {
+            Some(enrich_player_with_user(w).await)
+        } else {
+            None
+        };
+
+        games.push(GameWithPlayersEnriched {
             game,
-            players,
-            winner,
+            players: enriched_players,
+            winner: enriched_winner,
         });
     }
 

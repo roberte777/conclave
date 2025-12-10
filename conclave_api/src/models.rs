@@ -141,7 +141,7 @@ pub struct GameState {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GameHistory {
-    pub games: Vec<GameWithPlayers>,
+    pub games: Vec<GameWithPlayersEnriched>,
 }
 
 #[derive(Debug, Serialize)]
@@ -150,6 +150,15 @@ pub struct GameWithPlayers {
     pub game: Game,
     pub players: Vec<Player>,
     pub winner: Option<Player>,
+}
+
+/// Game with enriched player info (includes display names, avatars, etc.)
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GameWithPlayersEnriched {
+    pub game: Game,
+    pub players: Vec<PlayerWithUser>,
+    pub winner: Option<PlayerWithUser>,
 }
 
 #[derive(Debug, Serialize)]
