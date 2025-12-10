@@ -30,10 +30,7 @@ pub async fn websocket_handler(
     Query(params): Query<WebSocketQuery>,
     State(state): State<AppState>,
 ) -> impl IntoResponse {
-    info!(
-        "WebSocket connection attempt - Game: {}",
-        params.game_id
-    );
+    info!("WebSocket connection attempt - Game: {}", params.game_id);
 
     // Validate JWT token and get user info
     let user = match clerk::validate_and_get_user(&params.token).await {
@@ -55,7 +52,9 @@ pub async fn websocket_handler(
 
     info!(
         "WebSocket authenticated - Game: {}, User: {} ({})",
-        params.game_id, user.id, user.display_name()
+        params.game_id,
+        user.id,
+        user.display_name()
     );
 
     ws.on_upgrade(move |socket| handle_socket(socket, params.game_id, user, state))
@@ -93,7 +92,9 @@ async fn handle_socket(socket: WebSocket, game_id: Uuid, user: ClerkUser, state:
 
     info!(
         "WebSocket connected - Game: {}, User: {} ({})",
-        game_id, clerk_user_id, user.display_name()
+        game_id,
+        clerk_user_id,
+        user.display_name()
     );
 
     // Get receiver for game room messages - this will create the room if it doesn't exist
@@ -168,7 +169,12 @@ async fn verify_game(state: &AppState, game_id: Uuid) -> Result<()> {
     Ok(())
 }
 
-async fn add_user_to_game(state: &AppState, game_id: Uuid, clerk_user_id: &str, user: &ClerkUser) -> Result<()> {
+async fn add_user_to_game(
+    state: &AppState,
+    game_id: Uuid,
+    clerk_user_id: &str,
+    user: &ClerkUser,
+) -> Result<()> {
     // Verify user is a player in this game
     let players = database::get_players_in_game(&state.db, game_id).await?;
     let player = players.iter().find(|p| p.clerk_user_id == clerk_user_id);
@@ -342,13 +348,23 @@ async fn handle_life_update(
     Ok(())
 }
 
-async fn handle_join_game(clerk_user_id: &str, game_id: Uuid, state: &AppState, user: &ClerkUser) -> Result<()> {
+async fn handle_join_game(
+    clerk_user_id: &str,
+    game_id: Uuid,
+    state: &AppState,
+    user: &ClerkUser,
+) -> Result<()> {
     // Add user to game if not already present
     let result = database::join_game(&state.db, game_id, clerk_user_id).await;
 
     match result {
         Ok(player) => {
-            info!("Player {} ({}) joined game {}", clerk_user_id, user.display_name(), game_id);
+            info!(
+                "Player {} ({}) joined game {}",
+                clerk_user_id,
+                user.display_name(),
+                game_id
+            );
 
             // Create enriched player with user info
             let enriched_player = crate::models::PlayerWithUser::from_player(
@@ -427,7 +443,10 @@ async fn handle_end_game(game_id: Uuid, state: &AppState) -> Result<()> {
     };
 
     // Broadcast game ended event with enriched winner
-    let message = WebSocketMessage::GameEnded { game_id, winner: enriched_winner };
+    let message = WebSocketMessage::GameEnded {
+        game_id,
+        winner: enriched_winner,
+    };
     state.broadcast_to_game(game_id, message);
 
     // Clean up WebSocket room after a delay to allow final messages
@@ -641,6 +660,14 @@ pub async fn broadcast_player_joined(
 ) {
     // Enrich player with user info before broadcasting
     let enriched_player = database::enrich_player_with_user(player).await;
-    let message = WebSocketMessage::PlayerJoined { game_id, player: enriched_player };
+    let message = WebSocketMessage::PlayerJoined {
+        game_id,
+        player: enriched_player,
+    };
+    state.broadcast_to_game(game_id, message);
+}
+
+pub async fn broadcast_player_left(state: &AppState, game_id: Uuid, player_id: Uuid) {
+    let message = WebSocketMessage::PlayerLeft { game_id, player_id };
     state.broadcast_to_game(game_id, message);
 }
