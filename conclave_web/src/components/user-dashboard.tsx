@@ -139,7 +139,7 @@ export function UserDashboard() {
     <div className="min-h-screen bg-gradient-mesh">
       <div className="max-w-6xl mx-auto px-4 py-8 md:py-12">
         {/* Welcome Header */}
-        <div className="mb-10 animate-fade-in-up">
+        <div className="mb-10">
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div>
               <h1 className="text-3xl md:text-4xl font-bold mb-2">
@@ -166,7 +166,7 @@ export function UserDashboard() {
         </div>
 
         {/* Quick Action - Create Game */}
-        <div className="mb-10 animate-fade-in-up" style={{ animationDelay: "0.1s" }}>
+        <div className="mb-10">
           <button
             onClick={openCreateDialog}
             disabled={myActiveGames.length > 0}
@@ -197,7 +197,7 @@ export function UserDashboard() {
         </div>
 
         {/* Your Active Games */}
-        <section className="mb-10 animate-fade-in-up" style={{ animationDelay: "0.2s" }}>
+        <section className={cn("mb-10 transition-opacity duration-300", refreshing && "opacity-50")}>
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-500 to-green-500 flex items-center justify-center">
               <Crown className="w-5 h-5 text-white" />
@@ -231,11 +231,10 @@ export function UserDashboard() {
             </div>
           ) : (
             <div className="grid gap-4 md:grid-cols-2">
-              {myActiveGames.map((g, i) => (
+              {myActiveGames.map((g) => (
                 <div
                   key={g.game.id}
-                  className="glass-card rounded-2xl p-5 hover:bg-white/5 transition-all animate-fade-in-up"
-                  style={{ animationDelay: `${0.1 * i}s` }}
+                  className="glass-card rounded-2xl p-5 hover:bg-white/5 transition-all"
                 >
                   <div className="flex items-start justify-between gap-4 mb-4">
                     <div>
@@ -310,7 +309,7 @@ export function UserDashboard() {
         </section>
 
         {/* Available Games */}
-        <section className="animate-fade-in-up" style={{ animationDelay: "0.3s" }}>
+        <section className={cn("transition-opacity duration-300", refreshing && "opacity-50")}>
           <div className="flex items-center justify-between gap-3 mb-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
@@ -348,11 +347,10 @@ export function UserDashboard() {
             </div>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {availableGames.map((gameWithUsers, i) => (
+              {availableGames.map((gameWithUsers) => (
                 <div
                   key={gameWithUsers.game.id}
-                  className="glass-card rounded-2xl p-5 hover:bg-white/5 transition-all animate-fade-in-up"
-                  style={{ animationDelay: `${0.1 * i}s` }}
+                  className="glass-card rounded-2xl p-5 hover:bg-white/5 transition-all"
                 >
                   <div className={myActiveGames.length > 0 ? "" : "mb-4"}>
                     <h3 className="text-lg font-semibold mb-1">Game #{gameWithUsers.game.id.slice(0, 8)}</h3>
