@@ -1,5 +1,5 @@
 use crate::errors::{ApiError, Result};
-use jsonwebtoken::{decode, decode_header, DecodingKey, Validation};
+use jsonwebtoken::{DecodingKey, Validation, decode, decode_header};
 use once_cell::sync::OnceCell;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -10,7 +10,7 @@ use tracing::{debug, error, info, warn};
 
 /// Clerk user information extracted from JWT or fetched from API
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "snake_case")]
 pub struct ClerkUser {
     pub id: String,
     pub username: Option<String>,
@@ -98,8 +98,21 @@ impl ClerkClient {
         let secret_key = std::env::var("CLERK_SECRET_KEY").ok();
         let jwks_url = std::env::var("CLERK_JWKS_URL").ok();
 
-        if secret_key.is_none() && jwks_url.is_none() {
-            warn!("Neither CLERK_SECRET_KEY nor CLERK_JWKS_URL is set - JWT validation will be skipped");
+        match (secret_key.as_ref(), jwks_url.as_ref()) {
+            (Some(_), Some(_)) => {
+                // Strict mode enabled
+            }
+            (None, None) => {
+                // Dev mode - skip signature validation
+                warn!(
+                    "CLERK_SECRET_KEY and CLERK_JWKS_URL not set - dev mode: JWT signature validation disabled"
+                );
+            }
+            _ => {
+                return Err(ApiError::Internal(anyhow::anyhow!(
+                    "Invalid Clerk configuration: set BOTH CLERK_SECRET_KEY and CLERK_JWKS_URL, or NEITHER for development"
+                )));
+            }
         }
 
         let client = ClerkClient {
@@ -110,9 +123,9 @@ impl ClerkClient {
             user_cache: Arc::new(RwLock::new(HashMap::new())),
         };
 
-        CLERK_CLIENT.set(client).map_err(|_| {
-            ApiError::Internal(anyhow::anyhow!("Clerk client already initialized"))
-        })?;
+        CLERK_CLIENT
+            .set(client)
+            .map_err(|_| ApiError::Internal(anyhow::anyhow!("Clerk client already initialized")))?;
 
         info!("✅ Clerk client initialized");
         Ok(())
@@ -127,44 +140,35 @@ impl ClerkClient {
 
     /// Validate a JWT token and extract claims
     pub async fn validate_token(&self, token: &str) -> Result<ClerkClaims> {
-        // If no secret key or JWKS URL is configured, we can't validate
-        // In development, we might want to skip validation
+        // Dev mode: neither environment variable set -> skip signature validation
         if self.secret_key.is_none() && self.jwks_url.is_none() {
-            // Try to decode without validation for development
             let mut validation = Validation::default();
             validation.insecure_disable_signature_validation();
             validation.validate_exp = false;
 
-            let token_data = decode::<ClerkClaims>(
-                token,
-                &DecodingKey::from_secret(&[]),
-                &validation,
-            )
-            .map_err(|e| {
-                error!("Failed to decode JWT: {:?}", e);
-                ApiError::Unauthorized("Invalid token format".to_string())
-            })?;
+            let token_data =
+                decode::<ClerkClaims>(token, &DecodingKey::from_secret(&[]), &validation).map_err(
+                    |e| {
+                        error!("Failed to decode JWT: {:?}", e);
+                        ApiError::Unauthorized("Invalid token format".to_string())
+                    },
+                )?;
 
-            warn!("JWT validation skipped - no CLERK_SECRET_KEY or CLERK_JWKS_URL configured");
+            warn!("JWT signature validation skipped (dev mode)");
             return Ok(token_data.claims);
         }
 
-        // Try JWKS validation first if URL is available
-        if let Some(ref jwks_url) = self.jwks_url {
-            match self.validate_with_jwks(token, jwks_url).await {
-                Ok(claims) => return Ok(claims),
-                Err(e) => {
-                    debug!("JWKS validation failed, will try secret key: {:?}", e);
-                }
-            }
+        // Strict mode: require both to be set, and validate via JWKS only
+        if !(self.secret_key.is_some() && self.jwks_url.is_some()) {
+            return Err(ApiError::Internal(anyhow::anyhow!(
+                "Invalid Clerk configuration: both CLERK_SECRET_KEY and CLERK_JWKS_URL must be set together"
+            )));
         }
-
-        // Fall back to secret key validation
-        if let Some(ref secret) = self.secret_key {
-            return self.validate_with_secret(token, secret);
-        }
-
-        Err(ApiError::Unauthorized("Unable to validate token".to_string()))
+        let jwks_url = self
+            .jwks_url
+            .as_ref()
+            .ok_or_else(|| ApiError::Internal(anyhow::anyhow!("JWKS URL missing")))?;
+        self.validate_with_jwks(token, jwks_url).await
     }
 
     async fn validate_with_jwks(&self, token: &str, jwks_url: &str) -> Result<ClerkClaims> {
@@ -174,15 +178,16 @@ impl ClerkClient {
             ApiError::Unauthorized("Invalid token header".to_string())
         })?;
 
-        let kid = header.kid.ok_or_else(|| {
-            ApiError::Unauthorized("Token missing key ID".to_string())
-        })?;
+        let kid = header
+            .kid
+            .ok_or_else(|| ApiError::Unauthorized("Token missing key ID".to_string()))?;
 
         // Check cache first
-        let cached_key = {
-            let cache = self.jwks_cache.read().await;
-            cache.get(&kid).cloned()
-        };
+        let cached_key = None;
+        // let cached_key = {
+        //     let cache = self.jwks_cache.read().await;
+        //     cache.get(&kid).cloned()
+        // };
 
         let decoding_key = match cached_key {
             Some(key) => key,
@@ -205,11 +210,8 @@ impl ClerkClient {
                     })?;
 
                 // Find the matching key
-                let jwk = response
-                    .keys
-                    .iter()
-                    .find(|k| k.kid == kid)
-                    .ok_or_else(|| {
+                let jwk =
+                    response.keys.iter().find(|k| k.kid == kid).ok_or_else(|| {
                         ApiError::Unauthorized("Key not found in JWKS".to_string())
                     })?;
 
@@ -247,7 +249,7 @@ impl ClerkClient {
     }
 
     fn validate_with_secret(&self, token: &str, secret: &str) -> Result<ClerkClaims> {
-        let mut validation = Validation::new(jsonwebtoken::Algorithm::HS256);
+        let mut validation = Validation::new(jsonwebtoken::Algorithm::RS256);
         validation.validate_exp = true;
 
         let decoding_key = DecodingKey::from_secret(secret.as_bytes());
@@ -302,7 +304,6 @@ impl ClerkClient {
                 image_url: None,
             });
         }
-
         let user: ClerkUser = response.json().await.map_err(|e| {
             error!("Failed to parse Clerk user response: {:?}", e);
             ApiError::Internal(anyhow::anyhow!("Failed to parse user info"))
@@ -313,7 +314,6 @@ impl ClerkClient {
             let mut cache = self.user_cache.write().await;
             cache.insert(user_id.to_string(), user.clone());
         }
-
         Ok(user)
     }
 

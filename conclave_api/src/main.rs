@@ -9,7 +9,10 @@ mod websocket;
 
 use axum::{
     Router,
-    http::{Method, header::{AUTHORIZATION, CONTENT_TYPE}},
+    http::{
+        Method,
+        header::{AUTHORIZATION, CONTENT_TYPE},
+    },
     routing::{get, post, put},
 };
 use state::AppState;
@@ -24,6 +27,9 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // Load environment variables from .env if present (before reading any env vars)
+    let _ = dotenvy::dotenv();
+
     // Initialize tracing
     tracing_subscriber::registry()
         .with(
@@ -60,7 +66,10 @@ async fn main() -> anyhow::Result<()> {
         // User endpoints (authenticated via JWT - uses /users/me/ pattern)
         .route("/users/me/history", get(handlers::get_user_history))
         .route("/users/me/games", get(handlers::get_user_games))
-        .route("/users/me/available-games", get(handlers::get_available_games))
+        .route(
+            "/users/me/available-games",
+            get(handlers::get_available_games),
+        )
         // Game endpoints
         .route("/games", post(handlers::create_game))
         .route("/games", get(handlers::get_all_games))
