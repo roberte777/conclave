@@ -4,20 +4,29 @@
 
 The Conclave WebSocket API enables real-time communication for multiplayer games. It supports life tracking, player management, and game state synchronization across all connected clients.
 
+## Authentication
+
+All WebSocket connections require JWT authentication. The token is passed as a query parameter and is validated by the server.
+
+### JWT Token
+- Obtain a JWT token from Clerk using `getToken()` on the client
+- The token contains the user ID and is signed by Clerk
+- The server validates the token and extracts user information
+
 ## Connection
 
 ### Endpoint
 ```
-ws://localhost:8080/ws
+ws://localhost:3001/ws
 ```
 
 ### Query Parameters
-- `game_id` (UUID, required): The unique identifier of the game to connect to
-- `clerk_user_id` (String, required): The Clerk user ID for authentication
+- `gameId` (UUID, required): The unique identifier of the game to connect to
+- `token` (String, required): JWT token for authentication
 
 ### Example Connection
 ```
-ws://localhost:8080/ws?game_id=123e4567-e89b-12d3-a456-426614174000&clerk_user_id=user_abc123
+ws://localhost:3001/ws?gameId=123e4567-e89b-12d3-a456-426614174000&token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
 ## Message Format
@@ -41,20 +50,7 @@ Updates a player's life total.
 - `playerId` (UUID): The player whose life to update
 - `changeAmount` (integer): The amount to change life by (positive for gain, negative for loss)
 
-### 2. Join Game
-Adds the current user to the game as a player.
-
-```json
-{
-  "action": "joinGame",
-  "clerkUserId": "user_abc123"
-}
-```
-
-**Fields:**
-- `clerkUserId` (string): The Clerk user ID of the player joining
-
-### 3. Leave Game
+### 2. Leave Game
 Removes a player from the game.
 
 ```json
@@ -67,7 +63,7 @@ Removes a player from the game.
 **Fields:**
 - `playerId` (UUID): The player to remove from the game
 
-### 4. Get Game State
+### 3. Get Game State
 Requests the current game state to be broadcast to all clients.
 
 ```json
@@ -76,7 +72,7 @@ Requests the current game state to be broadcast to all clients.
 }
 ```
 
-### 5. End Game
+### 4. End Game
 Ends the current game and determines the winner.
 
 ```json
@@ -85,7 +81,7 @@ Ends the current game and determines the winner.
 }
 ```
 
-### 6. Set Commander Damage
+### 5. Set Commander Damage
 Sets the commander damage from one player to another to a specific value.
 
 ```json
@@ -104,7 +100,7 @@ Sets the commander damage from one player to another to a specific value.
 - `commanderNumber` (integer): Commander number (1 or 2 for partners)
 - `newDamage` (integer): The new total commander damage value
 
-### 7. Update Commander Damage
+### 6. Update Commander Damage
 Updates the commander damage by a relative amount.
 
 ```json
@@ -123,7 +119,7 @@ Updates the commander damage by a relative amount.
 - `commanderNumber` (integer): Commander number (1 or 2 for partners)
 - `damageAmount` (integer): Amount to add/subtract (positive for damage, negative to reduce)
 
-### 8. Toggle Partner
+### 7. Toggle Partner
 Enables or disables partner commander mode for a player.
 
 ```json
@@ -172,14 +168,17 @@ Notifies all clients when a new player joins the game.
     "clerkUserId": "user_abc123",
     "currentLife": 20,
     "position": 1,
-    "isEliminated": false
+    "isEliminated": false,
+    "displayName": "John Doe",
+    "username": "johndoe",
+    "imageUrl": "https://img.clerk.com/..."
   }
 }
 ```
 
 **Fields:**
 - `gameId` (UUID): The game the player joined
-- `player` (Player object): Complete player information
+- `player` (Player object): Complete player information with display info
 
 ### 3. Player Left
 Notifies all clients when a player leaves the game.
@@ -201,8 +200,7 @@ Sent when initially connecting and provides the complete current game state.
 
 ```json
 {
-  "type": "gameState",
-  "gameId": "123e4567-e89b-12d3-a456-426614174000",
+  "type": "gameStarted",
   "game": {
     "id": "123e4567-e89b-12d3-a456-426614174000",
     "name": "Epic Commander Game",
@@ -218,7 +216,10 @@ Sent when initially connecting and provides the complete current game state.
       "clerkUserId": "user_abc123",
       "currentLife": 38,
       "position": 1,
-      "isEliminated": false
+      "isEliminated": false,
+      "displayName": "John Doe",
+      "username": "johndoe",
+      "imageUrl": "https://img.clerk.com/..."
     }
   ],
   "recentChanges": [
@@ -247,9 +248,8 @@ Sent when initially connecting and provides the complete current game state.
 ```
 
 **Fields:**
-- `gameId` (UUID): The game identifier
 - `game` (Game object): Complete game information
-- `players` (Array): List of all players in the game
+- `players` (Array): List of all players in the game with display info
 - `recentChanges` (Array): Recent life changes for context
 - `commanderDamage` (Array): All commander damage relationships in the game
 
@@ -266,7 +266,10 @@ Notifies all clients when the game ends.
     "clerkUserId": "user_abc123",
     "currentLife": 25,
     "position": 1,
-    "isEliminated": false
+    "isEliminated": false,
+    "displayName": "John Doe",
+    "username": "johndoe",
+    "imageUrl": "https://img.clerk.com/..."
   }
 }
 ```
@@ -338,7 +341,10 @@ Sent when an error occurs.
   "clerkUserId": "user_abc123",
   "currentLife": 20,
   "position": 1,
-  "isEliminated": false
+  "isEliminated": false,
+  "displayName": "John Doe",
+  "username": "johndoe",
+  "imageUrl": "https://img.clerk.com/..."
 }
 ```
 
@@ -349,6 +355,9 @@ Sent when an error occurs.
 - `currentLife` (integer): Current life total
 - `position` (integer): Player position in the game (1-8)
 - `isEliminated` (boolean): Whether the player has been eliminated
+- `displayName` (string): User's display name (from Clerk)
+- `username` (string, optional): User's username (from Clerk)
+- `imageUrl` (string, optional): User's profile image URL (from Clerk)
 
 ### Game Object
 ```json
@@ -416,16 +425,18 @@ Sent when an error occurs.
 
 ## Connection Lifecycle
 
-1. **Connect**: Client connects with `game_id` and `clerk_user_id` query parameters
-2. **Verification**: Server verifies the game exists and is active
-3. **Auto-join**: If user is not already in the game, they are automatically added
-4. **Initial State**: Server sends `gameState` message with complete current game state including commander damage
-5. **Real-time Updates**: Server broadcasts all game events to connected clients
-6. **Disconnect**: Connection cleanup when client disconnects
+1. **Connect**: Client connects with `gameId` and JWT `token` query parameters
+2. **Authentication**: Server validates JWT token and extracts user information
+3. **Verification**: Server verifies the game exists and is active
+4. **Auto-join**: If user is not already in the game, they are automatically added
+5. **Initial State**: Server sends `gameStarted` message with complete current game state including user display info
+6. **Real-time Updates**: Server broadcasts all game events to connected clients
+7. **Disconnect**: Connection cleanup when client disconnects
 
 ## Error Handling
 
 Errors are sent as `error` type messages. Common error scenarios:
+- Authentication failed (invalid or expired JWT)
 - Game not found or not active
 - Invalid JSON format
 - Player not found
@@ -435,14 +446,14 @@ Errors are sent as `error` type messages. Common error scenarios:
 
 ```javascript
 class ConclaveWebSocket {
-  constructor(gameId, clerkUserId) {
+  constructor(gameId, token) {
     this.gameId = gameId;
-    this.clerkUserId = clerkUserId;
+    this.token = token;
     this.ws = null;
   }
 
   connect() {
-    const url = `ws://localhost:8080/ws?game_id=${this.gameId}&clerk_user_id=${this.clerkUserId}`;
+    const url = `ws://localhost:3001/ws?gameId=${this.gameId}&token=${encodeURIComponent(this.token)}`;
     this.ws = new WebSocket(url);
     
     this.ws.onopen = () => {
@@ -469,22 +480,25 @@ class ConclaveWebSocket {
         console.log(`Player ${message.playerId} life changed to ${message.newLife}`);
         break;
       case 'playerJoined':
-        console.log(`Player ${message.player.clerkUserId} joined the game`);
+        // Player now includes displayName, username, imageUrl
+        console.log(`Player ${message.player.displayName} joined the game`);
         break;
       case 'playerLeft':
         console.log(`Player ${message.playerId} left the game`);
         break;
-      case 'gameState':
+      case 'gameStarted':
+        // Players include display info from backend
         console.log('Game state received:', message);
         break;
       case 'gameEnded':
-        console.log('Game ended. Winner:', message.winner);
+        // Winner includes display info
+        console.log('Game ended. Winner:', message.winner?.displayName);
         break;
       case 'commanderDamageUpdate':
-        console.log(`Commander damage: Player ${message.fromPlayerId} dealt ${message.damageAmount} to ${message.toPlayerId} (Commander ${message.commanderNumber}). New total: ${message.newDamage}`);
+        console.log(`Commander damage: ${message.damageAmount} dealt. New total: ${message.newDamage}`);
         break;
       case 'partnerToggled':
-        console.log(`Player ${message.playerId} ${message.hasPartner ? 'enabled' : 'disabled'} partner commander`);
+        console.log(`Player ${message.playerId} ${message.hasPartner ? 'enabled' : 'disabled'} partner`);
         break;
       case 'error':
         console.error('Game error:', message.message);
@@ -497,13 +511,6 @@ class ConclaveWebSocket {
       action: 'updateLife',
       playerId,
       changeAmount
-    });
-  }
-
-  joinGame() {
-    this.send({
-      action: 'joinGame',
-      clerkUserId: this.clerkUserId
     });
   }
 
@@ -567,12 +574,13 @@ class ConclaveWebSocket {
   }
 }
 
-// Usage
-const client = new ConclaveWebSocket(
-  '123e4567-e89b-12d3-a456-426614174000',
-  'user_abc123'
-);
-client.connect();
+// Usage - obtain token from Clerk first
+async function connectToGame(gameId) {
+  const token = await clerk.session.getToken();
+  const client = new ConclaveWebSocket(gameId, token);
+  client.connect();
+  return client;
+}
 ```
 
 ## Notes
@@ -587,4 +595,5 @@ client.connect();
 - Each player can have 1-2 commanders (partner support)
 - Commander damage of 21 or more results in player elimination
 - Commander damage is automatically initialized when players join
-- All commander damage entries are cleaned up when players leave 
+- All commander damage entries are cleaned up when players leave
+- **User display info (displayName, username, imageUrl) is provided by the backend** - clients don't need to fetch this from Clerk

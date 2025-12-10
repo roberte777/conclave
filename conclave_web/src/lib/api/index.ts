@@ -30,7 +30,12 @@ export class ConclaveAPI {
     });
   }
 
-  connectWebSocket(gameId: string, clerkUserId: string): WebSocketClient {
+  /**
+   * Connect to WebSocket for real-time game updates
+   * @param gameId - The game ID to connect to
+   * @param token - JWT token for authentication
+   */
+  connectWebSocket(gameId: string, token: string): WebSocketClient {
     if (this.wsClient) {
       this.wsClient.disconnect();
     }
@@ -53,7 +58,7 @@ export class ConclaveAPI {
     this.wsClient = new WebSocketClient({
       url: wsUrl,
       gameId,
-      clerkUserId,
+      token,
     });
 
     this.wsClient.connect();

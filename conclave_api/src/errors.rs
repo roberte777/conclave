@@ -29,6 +29,9 @@ pub enum ApiError {
     #[error("WebSocket error: {0}")]
     WebSocket(String),
 
+    #[error("Unauthorized: {0}")]
+    Unauthorized(String),
+
     #[error("Internal server error")]
     Internal(#[from] anyhow::Error),
 }
@@ -46,6 +49,7 @@ impl IntoResponse for ApiError {
             ApiError::UserInActiveGame => (StatusCode::CONFLICT, "User is already in an active game"),
             ApiError::BadRequest(ref msg) => (StatusCode::BAD_REQUEST, msg.as_str()),
             ApiError::WebSocket(ref msg) => (StatusCode::BAD_REQUEST, msg.as_str()),
+            ApiError::Unauthorized(ref msg) => (StatusCode::UNAUTHORIZED, msg.as_str()),
             ApiError::Internal(ref e) => {
                 tracing::error!("Internal error: {:?}", e);
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error")

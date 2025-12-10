@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useUser } from "@clerk/nextjs";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { useUser, useAuth } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -22,10 +22,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Plus, Users, Trophy } from "lucide-react";
 import { ConclaveAPI, type GameWithUsers, DEFAULT_STARTING_LIFE } from "@/lib/api";
-import { useMemo } from "react";
 
 export function UserDashboard() {
   const { user } = useUser();
+  const { getToken } = useAuth();
   const [creatingGame, setCreatingGame] = useState(false);
   const [myActiveGames, setMyActiveGames] = useState<GameWithUsers[]>([]);
   const [availableGames, setAvailableGames] = useState<GameWithUsers[]>([]);
@@ -38,17 +38,21 @@ export function UserDashboard() {
 
   const api = useMemo(() => {
     const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-    return new ConclaveAPI({ httpUrl: `${base}/api/v1` });
-  }, []);
+    return new ConclaveAPI({
+      httpUrl: `${base}/api/v1`,
+      getAuthToken: () => getToken({ template: "default" }),
+    });
+  }, [getToken]);
 
   const refreshGames = useCallback(async () => {
     if (!user?.id) return;
 
     setLoadingGames(true);
     try {
+      // getUserGames and getAvailableGames now use JWT from Authorization header
       const [userGames, joinableGames] = await Promise.all([
-        api.http.getUserGames(user.id),
-        api.http.getAvailableGames(user.id),
+        api.http.getUserGames(),
+        api.http.getAvailableGames(),
       ]);
       setMyActiveGames(userGames.filter((g) => g.game.status === "active"));
       setAvailableGames(joinableGames);
@@ -75,8 +79,8 @@ export function UserDashboard() {
 
     setCreatingGame(true);
     try {
+      // clerkUserId now comes from JWT token in Authorization header
       const game = await api.http.createGame({
-        clerkUserId: user.id,
         name: gameName,
         startingLife: parsedLife,
       });
@@ -108,7 +112,8 @@ export function UserDashboard() {
     if (!user?.id) return;
     setLeavingGameId(gameId);
     try {
-      await api.http.leaveGame(gameId, user.id);
+      // clerkUserId now comes from JWT token in Authorization header
+      await api.http.leaveGame(gameId);
       await refreshGames();
     } catch (error) {
       console.error("Failed to leave game:", error);

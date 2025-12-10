@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback } from "react";
+import { useAuth } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConclaveAPI, type GameState, type Player } from "@/lib/api";
@@ -9,12 +10,12 @@ import { Swords } from "lucide-react";
 
 interface GamePageClientProps {
     gameId: string;
-    clerkUserId: string;
 }
 
 type PartnerState = Record<string, boolean>;
 
-export function GamePageClient({ gameId, clerkUserId }: GamePageClientProps) {
+export function GamePageClient({ gameId }: GamePageClientProps) {
+    const { getToken } = useAuth();
     const api = useMemo(() => new ConclaveAPI({}), []);
 
     const [isConnected, setIsConnected] = useState(false);
@@ -22,154 +23,148 @@ export function GamePageClient({ gameId, clerkUserId }: GamePageClientProps) {
     const [state, setState] = useState<GameState | null>(null);
     const [partnerEnabled, setPartnerEnabled] = useState<PartnerState>({});
     const [winner, setWinner] = useState<Player | null>(null);
-    const [userNames, setUserNames] = useState<Record<string, { name: string; imageUrl?: string }>>({});
     const [showIncomingDamage, setShowIncomingDamage] = useState<Record<string, boolean>>({});
 
     // Establish websocket connection and wire up handlers
     useEffect(() => {
-        const ws = api.connectWebSocket(gameId, clerkUserId);
+        let ws: ReturnType<typeof api.connectWebSocket> | null = null;
+        let cleanupFunctions: (() => void)[] = [];
 
-        const offConnect = ws.onConnect(() => {
-            setIsConnected(true);
-            setError(null);
-            ws.getGameState();
-        });
-
-        const offDisconnect = ws.onDisconnect(() => {
-            setIsConnected(false);
-        });
-
-        const offError = ws.onError((e) => {
-            setError(e.message || "WebSocket error");
-        });
-
-        const offAll = ws.on("*", (message) => {
-            switch (message.type) {
-                case "gameStarted": {
-                    const next: GameState = {
-                        game: message.game,
-                        players: message.players,
-                        recentChanges: message.recentChanges,
-                        commanderDamage: message.commanderDamage,
-                    };
-                    setState(next);
-                    // fetch display names for players
-                    fetchDisplayNames(message.players.map((p) => p.clerkUserId));
-                    break;
-                }
-                case "lifeUpdate": {
-                    setState((prev) => {
-                        if (!prev) return prev;
-                        const players = prev.players.map((p) =>
-                            p.id === message.playerId ? { ...p, currentLife: message.newLife } : p
-                        );
-                        return { ...prev, players };
-                    });
-                    break;
-                }
-                case "playerJoined": {
-                    // Refresh full state to sync commander damage matrix
-                    ws.getGameState();
-                    fetchDisplayNames([message.player.clerkUserId]);
-                    break;
-                }
-                case "playerLeft": {
-                    // Optimistically remove player and refresh to sync damage matrix
-                    setState((prev) => {
-                        if (!prev) return prev;
-                        const players = prev.players.filter((p) => p.id !== message.playerId);
-                        const commanderDamage = prev.commanderDamage.filter(
-                            (cd) => cd.fromPlayerId !== message.playerId && cd.toPlayerId !== message.playerId
-                        );
-                        return { ...prev, players, commanderDamage };
-                    });
-                    ws.getGameState();
-                    break;
-                }
-                case "commanderDamageUpdate": {
-                    setState((prev) => {
-                        if (!prev) return prev;
-                        const idx = prev.commanderDamage.findIndex(
-                            (cd) =>
-                                cd.fromPlayerId === message.fromPlayerId &&
-                                cd.toPlayerId === message.toPlayerId &&
-                                cd.commanderNumber === message.commanderNumber
-                        );
-                        if (idx >= 0) {
-                            const next = [...prev.commanderDamage];
-                            next[idx] = { ...next[idx], damage: message.newDamage };
-                            return { ...prev, commanderDamage: next };
-                        }
-                        return {
-                            ...prev,
-                            commanderDamage: [
-                                ...prev.commanderDamage,
-                                {
-                                    id: `${message.fromPlayerId}-${message.toPlayerId}-${message.commanderNumber}`,
-                                    gameId: prev.game.id,
-                                    fromPlayerId: message.fromPlayerId,
-                                    toPlayerId: message.toPlayerId,
-                                    commanderNumber: message.commanderNumber,
-                                    damage: message.newDamage,
-                                    createdAt: new Date().toISOString(),
-                                    updatedAt: new Date().toISOString(),
-                                },
-                            ],
-                        };
-                    });
-                    break;
-                }
-                case "partnerToggled": {
-                    setPartnerEnabled((prev) => ({ ...prev, [message.playerId]: message.hasPartner }));
-                    break;
-                }
-                case "gameEnded": {
-                    setWinner(message.winner || null);
-                    break;
-                }
-                case "error": {
-                    setError(message.message);
-                    break;
-                }
+        const connect = async () => {
+            // Get JWT token for authentication
+            const token = await getToken({ template: "default" });
+            if (!token) {
+                setError("Not authenticated");
+                return;
             }
-        });
+
+            ws = api.connectWebSocket(gameId, token);
+
+            const offConnect = ws.onConnect(() => {
+                setIsConnected(true);
+                setError(null);
+                ws?.getGameState();
+            });
+
+            const offDisconnect = ws.onDisconnect(() => {
+                setIsConnected(false);
+            });
+
+            const offError = ws.onError((e) => {
+                setError(e.message || "WebSocket error");
+            });
+
+            const offAll = ws.on("*", (message) => {
+                switch (message.type) {
+                    case "gameStarted": {
+                        const next: GameState = {
+                            game: message.game,
+                            players: message.players,
+                            recentChanges: message.recentChanges,
+                            commanderDamage: message.commanderDamage,
+                        };
+                        setState(next);
+                        // No need to fetch display names - they come from the backend now!
+                        break;
+                    }
+                    case "lifeUpdate": {
+                        setState((prev) => {
+                            if (!prev) return prev;
+                            const players = prev.players.map((p) =>
+                                p.id === message.playerId ? { ...p, currentLife: message.newLife } : p
+                            );
+                            return { ...prev, players };
+                        });
+                        break;
+                    }
+                    case "playerJoined": {
+                        // Add the new player directly - they come with display info!
+                        setState((prev) => {
+                            if (!prev) return prev;
+                            // Check if player already exists
+                            if (prev.players.some(p => p.id === message.player.id)) {
+                                return prev;
+                            }
+                            return {
+                                ...prev,
+                                players: [...prev.players, message.player],
+                            };
+                        });
+                        // Refresh full state to sync commander damage matrix
+                        ws?.getGameState();
+                        break;
+                    }
+                    case "playerLeft": {
+                        // Optimistically remove player and refresh to sync damage matrix
+                        setState((prev) => {
+                            if (!prev) return prev;
+                            const players = prev.players.filter((p) => p.id !== message.playerId);
+                            const commanderDamage = prev.commanderDamage.filter(
+                                (cd) => cd.fromPlayerId !== message.playerId && cd.toPlayerId !== message.playerId
+                            );
+                            return { ...prev, players, commanderDamage };
+                        });
+                        ws?.getGameState();
+                        break;
+                    }
+                    case "commanderDamageUpdate": {
+                        setState((prev) => {
+                            if (!prev) return prev;
+                            const idx = prev.commanderDamage.findIndex(
+                                (cd) =>
+                                    cd.fromPlayerId === message.fromPlayerId &&
+                                    cd.toPlayerId === message.toPlayerId &&
+                                    cd.commanderNumber === message.commanderNumber
+                            );
+                            if (idx >= 0) {
+                                const next = [...prev.commanderDamage];
+                                next[idx] = { ...next[idx], damage: message.newDamage };
+                                return { ...prev, commanderDamage: next };
+                            }
+                            return {
+                                ...prev,
+                                commanderDamage: [
+                                    ...prev.commanderDamage,
+                                    {
+                                        id: `${message.fromPlayerId}-${message.toPlayerId}-${message.commanderNumber}`,
+                                        gameId: prev.game.id,
+                                        fromPlayerId: message.fromPlayerId,
+                                        toPlayerId: message.toPlayerId,
+                                        commanderNumber: message.commanderNumber,
+                                        damage: message.newDamage,
+                                        createdAt: new Date().toISOString(),
+                                        updatedAt: new Date().toISOString(),
+                                    },
+                                ],
+                            };
+                        });
+                        break;
+                    }
+                    case "partnerToggled": {
+                        setPartnerEnabled((prev) => ({ ...prev, [message.playerId]: message.hasPartner }));
+                        break;
+                    }
+                    case "gameEnded": {
+                        setWinner(message.winner || null);
+                        break;
+                    }
+                    case "error": {
+                        setError(message.message);
+                        break;
+                    }
+                }
+            });
+
+            cleanupFunctions = [offConnect, offDisconnect, offError, offAll];
+        };
+
+        connect();
 
         return () => {
-            offConnect();
-            offDisconnect();
-            offError();
-            offAll();
+            cleanupFunctions.forEach(fn => fn());
             api.disconnectWebSocket();
         };
-    }, [api, gameId, clerkUserId]);
-
-    const fetchDisplayNames = useCallback(async (userIds: string[]) => {
-        const unique = userIds.filter((id) => !userNames[id]);
-        if (unique.length === 0) return;
-        try {
-            const results = await Promise.all(
-                unique.map(async (id) => {
-                    try {
-                        const res = await fetch(`/api/users/${id}`, {
-                            // force server execution even during static builds
-                            cache: "no-store",
-                        });
-                        if (!res.ok) throw new Error("not ok");
-                        const data = await res.json();
-                        const name = data.fullName || data.username || id;
-                        return [id, { name, imageUrl: data.imageUrl as string | undefined }] as const;
-                    } catch {
-                        return [id, { name: id }] as const;
-                    }
-                })
-            );
-            setUserNames((prev) => {
-                const next = { ...prev } as Record<string, { name: string; imageUrl?: string }>;
-                for (const [id, payload] of results) next[id] = payload;
-                return next;
-            });
-        } catch { }
-    }, [userNames]);
+    }, [api, gameId, getToken]);
 
     const changeLife = useCallback(
         (playerId: string, delta: number) => {
@@ -210,11 +205,6 @@ export function GamePageClient({ gameId, clerkUserId }: GamePageClientProps) {
             api.ws?.togglePartner(playerId, !enabled);
         },
         [api, partnerEnabled]
-    );
-
-    const getDisplayName = useCallback(
-        (id: string) => userNames[id]?.name || "Player",
-        [userNames]
     );
 
     if (error) {
@@ -258,7 +248,7 @@ export function GamePageClient({ gameId, clerkUserId }: GamePageClientProps) {
                     </CardHeader>
                     <CardContent>
                         <p>
-                            Winner: <span className="font-semibold">{winner.clerkUserId}</span> with {winner.currentLife} life
+                            Winner: <span className="font-semibold">{winner.displayName}</span> with {winner.currentLife} life
                         </p>
                     </CardContent>
                 </Card>
@@ -270,17 +260,17 @@ export function GamePageClient({ gameId, clerkUserId }: GamePageClientProps) {
                         <CardHeader>
                             <CardTitle className="flex items-center justify-between">
                                 <span className="flex items-center gap-2 min-w-0">
-                                    {userNames[p.clerkUserId]?.imageUrl ? (
+                                    {p.imageUrl ? (
                                         <Image
-                                            src={userNames[p.clerkUserId]!.imageUrl!}
-                                            alt={userNames[p.clerkUserId]?.name || "Player"}
+                                            src={p.imageUrl}
+                                            alt={p.displayName}
                                             width={20}
                                             height={20}
                                             className="rounded-full"
                                         />
                                     ) : null}
-                                    <span className={`truncate max-w-[160px] ${userNames[p.clerkUserId] ? "" : "text-muted-foreground"}`}>
-                                        P{p.position}: {getDisplayName(p.clerkUserId)}
+                                    <span className="truncate max-w-[160px]">
+                                        P{p.position}: {p.displayName}
                                     </span>
                                 </span>
                                 <div className="flex items-center gap-2">

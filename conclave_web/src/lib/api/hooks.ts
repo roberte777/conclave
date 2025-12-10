@@ -5,7 +5,8 @@ import type { ConclaveAPIConfig, WebSocketMessage, GameState } from "./index";
 export interface UseConclaveOptions extends ConclaveAPIConfig {
   autoConnect?: boolean;
   gameId?: string;
-  clerkUserId?: string;
+  /** JWT token for authentication */
+  token?: string;
 }
 
 export interface ConclaveState {
@@ -35,8 +36,8 @@ export function useConclave(options: UseConclaveOptions = {}): ConclaveState {
   useEffect(() => {
     const api = apiRef.current!;
     
-    if (options.autoConnect !== false && options.gameId && options.clerkUserId) {
-      const ws = api.connectWebSocket(options.gameId, options.clerkUserId);
+    if (options.autoConnect !== false && options.gameId && options.token) {
+      const ws = api.connectWebSocket(options.gameId, options.token);
       
       const unsubConnect = ws.onConnect(() => {
         setIsConnected(true);
@@ -73,7 +74,7 @@ export function useConclave(options: UseConclaveOptions = {}): ConclaveState {
         api.disconnectWebSocket();
       };
     }
-  }, [options.gameId, options.clerkUserId, options.autoConnect]);
+  }, [options.gameId, options.token, options.autoConnect]);
 
   return {
     api: apiRef.current!,

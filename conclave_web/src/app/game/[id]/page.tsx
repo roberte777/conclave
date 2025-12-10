@@ -10,5 +10,6 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
     redirect("/");
   }
 
-  return <GamePageClient gameId={id} clerkUserId={userId!} />;
+  // clerkUserId is now obtained from JWT token in the client component
+  return <GamePageClient gameId={id} />;
 }

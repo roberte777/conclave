@@ -43,7 +43,8 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
         private var lifeChanges: [UUID: [LifeChange]] = [:]
         private var _isConnected = false
         private var _connectedGameId: UUID?
-        private var _connectedUserId: String?
+        private var _authToken: String?
+        private var _mockUserId: String = "mock_user_\(UUID().uuidString.prefix(8))"
 
         // WebSocket simulation
         private var messageContinuation:
@@ -66,24 +67,32 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
             messageContinuation?.yield(message)
         }
 
+        func setAuthToken(_ token: String?) {
+            _authToken = token
+        }
+
+        func getAuthToken() -> String? {
+            return _authToken
+        }
+
+        func getMockUserId() -> String {
+            return _mockUserId
+        }
+
         func setConnected(
             _ connected: Bool,
-            gameId: UUID? = nil,
-            userId: String? = nil
+            gameId: UUID? = nil
         ) {
             _isConnected = connected
             _connectedGameId = gameId
-            _connectedUserId = userId
         }
 
         func isConnected() -> Bool {
             return _isConnected
         }
 
-        func getConnectionInfo() -> (gameId: UUID, userId: String)? {
-            guard let gameId = _connectedGameId, let userId = _connectedUserId
-            else { return nil }
-            return (gameId, userId)
+        func getConnectionInfo() -> UUID? {
+            return _connectedGameId
         }
 
         func createGame(_ game: Game, creator: Player) {
@@ -135,7 +144,10 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
                 clerkUserId: oldPlayer.clerkUserId,
                 currentLife: newLife,
                 position: oldPlayer.position,
-                isEliminated: newLife <= 0
+                isEliminated: newLife <= 0,
+                displayName: oldPlayer.displayName,
+                username: oldPlayer.username,
+                imageUrl: oldPlayer.imageUrl
             )
 
             players[gameId]![playerIndex] = updatedPlayer
@@ -205,6 +217,12 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
         return UUID()
     }
 
+    // MARK: - Authentication
+
+    public func setAuthToken(_ token: String?) async {
+        await mockState.setAuthToken(token)
+    }
+
     // MARK: - ConclaveAPIClient Implementation
 
     public func health() async throws -> HealthResponse {
@@ -230,13 +248,14 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
         )
     }
 
-    public func getUserHistory(clerkUserId: String) async throws -> GameHistory
-    {
+    public func getUserHistory() async throws -> GameHistory {
         await simulateNetworkDelay()
 
         if shouldSimulateError() {
             throw ConclaveError.networkError(URLError(.cannotConnectToHost))
         }
+
+        let clerkUserId = await mockState.getMockUserId()
 
         // Generate mock game history
         let mockGames = (0..<3).map { i in
@@ -257,7 +276,8 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
                     clerkUserId: j == 0 ? clerkUserId : "mock_opponent_\(j)",
                     currentLife: Int32.random(in: 0...40),
                     position: Int32(j + 1),
-                    isEliminated: false
+                    isEliminated: false,
+                    displayName: j == 0 ? "You" : "Opponent \(j)"
                 )
             }
 
@@ -271,14 +291,14 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
         return GameHistory(games: mockGames)
     }
 
-    public func getUserGames(clerkUserId: String) async throws
-        -> [GameWithUsers]
-    {
+    public func getUserGames() async throws -> [GameWithUsers] {
         await simulateNetworkDelay()
 
         if shouldSimulateError() {
             throw ConclaveError.networkError(URLError(.timedOut))
         }
+
+        let clerkUserId = await mockState.getMockUserId()
 
         // Return mock active games
         let mockGame = Game(
@@ -291,17 +311,15 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
         )
 
         let users = [
-            UserInfo(clerkUserId: clerkUserId),
-            UserInfo(clerkUserId: "mock_player_1"),
-            UserInfo(clerkUserId: "mock_player_2"),
+            UserInfo(clerkUserId: clerkUserId, displayName: "You"),
+            UserInfo(clerkUserId: "mock_player_1", displayName: "Player 1"),
+            UserInfo(clerkUserId: "mock_player_2", displayName: "Player 2"),
         ]
 
         return [GameWithUsers(game: mockGame, users: users)]
     }
 
-    public func getAvailableGames(clerkUserId: String) async throws
-        -> [GameWithUsers]
-    {
+    public func getAvailableGames() async throws -> [GameWithUsers] {
         await simulateNetworkDelay()
 
         if shouldSimulateError() {
@@ -319,8 +337,8 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
         )
 
         let users = [
-            UserInfo(clerkUserId: "mock_host"),
-            UserInfo(clerkUserId: "mock_player_1"),
+            UserInfo(clerkUserId: "mock_host", displayName: "Host"),
+            UserInfo(clerkUserId: "mock_player_1", displayName: "Player 1"),
         ]
 
         return [GameWithUsers(game: mockGame, users: users)]
@@ -362,21 +380,21 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
         )
 
         let users1 = [
-            UserInfo(clerkUserId: "mock_host"),
-            UserInfo(clerkUserId: "mock_player_1"),
+            UserInfo(clerkUserId: "mock_host", displayName: "Host"),
+            UserInfo(clerkUserId: "mock_player_1", displayName: "Player 1"),
         ]
 
         let users2 = [
-            UserInfo(clerkUserId: "mock_host"),
-            UserInfo(clerkUserId: "mock_player_2"),
-            UserInfo(clerkUserId: "mock_player_3"),
-            UserInfo(clerkUserId: "mock_player_4"),
+            UserInfo(clerkUserId: "mock_host", displayName: "Host"),
+            UserInfo(clerkUserId: "mock_player_2", displayName: "Player 2"),
+            UserInfo(clerkUserId: "mock_player_3", displayName: "Player 3"),
+            UserInfo(clerkUserId: "mock_player_4", displayName: "Player 4"),
         ]
 
         let users3 = [
-            UserInfo(clerkUserId: "mock_host"),
-            UserInfo(clerkUserId: "mock_player_2"),
-            UserInfo(clerkUserId: "mock_player_3"),
+            UserInfo(clerkUserId: "mock_host", displayName: "Host"),
+            UserInfo(clerkUserId: "mock_player_2", displayName: "Player 2"),
+            UserInfo(clerkUserId: "mock_player_3", displayName: "Player 3"),
         ]
 
         return [
@@ -398,6 +416,7 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
 
         let gameId = generateMockGameId()
         let playerId = generateMockPlayerId()
+        let clerkUserId = await mockState.getMockUserId()
 
         let game = Game(
             id: gameId,
@@ -411,10 +430,11 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
         let creator = Player(
             id: playerId,
             gameId: gameId,
-            clerkUserId: request.clerkUserId,
+            clerkUserId: clerkUserId,
             currentLife: game.startingLife,
             position: 1,
-            isEliminated: false
+            isEliminated: false,
+            displayName: "You"
         )
 
         await mockState.createGame(game, creator: creator)
@@ -458,9 +478,7 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
         )
     }
 
-    public func joinGame(gameId: UUID, request: JoinGameRequest) async throws
-        -> Player
-    {
+    public func joinGame(gameId: UUID) async throws -> Player {
         await simulateNetworkDelay()
 
         if shouldSimulateError() {
@@ -474,11 +492,12 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
             throw ConclaveError.gameNotFound("Game with ID \(gameId) not found")
         }
 
+        let clerkUserId = await mockState.getMockUserId()
         let existingPlayers = await mockState.getPlayers(gameId)
 
         // Check if player already exists
         if let existingPlayer = existingPlayers.first(where: {
-            $0.clerkUserId == request.clerkUserId
+            $0.clerkUserId == clerkUserId
         }) {
             return existingPlayer
         }
@@ -489,10 +508,11 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
         let player = Player(
             id: playerId,
             gameId: gameId,
-            clerkUserId: request.clerkUserId,
+            clerkUserId: clerkUserId,
             currentLife: game.startingLife,
             position: position,
-            isEliminated: false
+            isEliminated: false,
+            displayName: "You"
         )
 
         await mockState.addPlayer(player, to: gameId)
@@ -506,21 +526,22 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
         return player
     }
 
-    public func leaveGame(gameId: UUID, request: JoinGameRequest) async throws {
+    public func leaveGame(gameId: UUID) async throws {
         await simulateNetworkDelay()
 
         if shouldSimulateError() {
             throw ConclaveError.networkError(URLError(.networkConnectionLost))
         }
 
+        let clerkUserId = await mockState.getMockUserId()
         let players = await mockState.getPlayers(gameId)
         guard
             let player = players.first(where: {
-                $0.clerkUserId == request.clerkUserId
+                $0.clerkUserId == clerkUserId
             })
         else {
             throw ConclaveError.playerNotFound(
-                "Player with Clerk user ID \(request.clerkUserId) not found"
+                "Player with Clerk user ID \(clerkUserId) not found"
             )
         }
 
@@ -646,14 +667,14 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
         }
     }
 
-    public func connect(gameId: UUID, clerkUserId: String) async throws {
+    public func connect(gameId: UUID, token: String) async throws {
         await simulateNetworkDelay()
 
         if shouldSimulateError() {
             throw ConclaveError.webSocketError("Mock connection error")
         }
 
-        await mockState.setConnected(true, gameId: gameId, userId: clerkUserId)
+        await mockState.setConnected(true, gameId: gameId)
 
         // Send initial game state
         do {
@@ -681,7 +702,7 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
             throw ConclaveError.webSocketError("Mock send error")
         }
 
-        guard let (gameId, _) = await mockState.getConnectionInfo() else {
+        guard let gameId = await mockState.getConnectionInfo() else {
             throw ConclaveError.notConnected
         }
 
@@ -692,11 +713,6 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
                 gameId: gameId,
                 playerId: playerId,
                 changeAmount: changeAmount
-            )
-        case .joinGame(let clerkUserId):
-            try await handleMockJoinGame(
-                gameId: gameId,
-                clerkUserId: clerkUserId
             )
         case .leaveGame(let playerId):
             try await handleMockLeaveGame(gameId: gameId, playerId: playerId)
@@ -744,11 +760,6 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
             playerId: playerId,
             changeAmount: changeAmount
         )
-        try await sendMessage(message)
-    }
-
-    public func joinGame(clerkUserId: String) async throws {
-        let message = ClientMessage.joinGame(clerkUserId: clerkUserId)
         try await sendMessage(message)
     }
 
@@ -837,13 +848,6 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
         await mockState.broadcastMessage(.lifeUpdate(message))
     }
 
-    private func handleMockJoinGame(gameId: UUID, clerkUserId: String)
-        async throws
-    {
-        let request = JoinGameRequest(clerkUserId: clerkUserId)
-        _ = try await joinGame(gameId: gameId, request: request)
-    }
-
     private func handleMockLeaveGame(gameId: UUID, playerId: UUID) async throws
     {
         let players = await mockState.getPlayers(gameId)
@@ -853,8 +857,13 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
             )
         }
 
-        let request = JoinGameRequest(clerkUserId: player.clerkUserId)
-        try await leaveGame(gameId: gameId, request: request)
+        await mockState.removePlayer(withId: player.id, from: gameId)
+
+        // Broadcast player left via WebSocket
+        if await mockState.isConnected() {
+            let message = PlayerLeftMessage(gameId: gameId, playerId: player.id)
+            await mockState.broadcastMessage(.playerLeft(message))
+        }
     }
 
     private func handleMockGetGameState(gameId: UUID) async throws {

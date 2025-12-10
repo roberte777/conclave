@@ -23,19 +23,9 @@ struct GameListView: View {
                     actions: {
                         TextField("Game Name", text: $newGameName)
                         Button("Create") {
-                            if let user = clerk.user {
-                                Task {
-                                    await addGame(
-                                        gameName: newGameName,
-                                        clerkUserId: user.id
-                                    )
-                                    newGameName = ""
-                                }
-                            } else {
-                                // Not logged in, show error
-                                print(
-                                    "You must be logged in to create a game."
-                                )
+                            Task {
+                                await addGame(gameName: newGameName)
+                                newGameName = ""
                             }
                         }
                         Button("Cancel", role: .cancel) {
@@ -60,7 +50,7 @@ struct GameListView: View {
                 }
 
             }.task {
-                await getAllGames()
+                await setupAuthAndFetchGames()
             }
             .padding(.bottom, 16)
 
@@ -69,17 +59,8 @@ struct GameListView: View {
                 .bold()
             ForEach(conclave.allGames) { item in
                 Button(action: {
-                    if let user = clerk.user {
-                        Task {
-                            await joinGame(
-                                gameId: item.game.id,
-                                clerkUserId: user.id
-                            )
-                        }
-                    } else {
-                        print(
-                            "You must be logged in to join a game."
-                        )
+                    Task {
+                        await joinGame(gameId: item.game.id)
                     }
                 }) {
                     Text(item.game.name)
@@ -95,37 +76,36 @@ struct GameListView: View {
         Spacer()
     }
 
-    private func addGame(gameName: String, clerkUserId: String) async {
+    private func setupAuthAndFetchGames() async {
+        // Get token from Clerk and set it on the manager
+        if let session = clerk.session {
+            do {
+                let token = try await session.getToken()
+                await conclave.setAuthToken(token?.jwt)
+            } catch {
+                print("Failed to get auth token: \(error)")
+            }
+        }
+        await getAllGames()
+    }
+
+    private func addGame(gameName: String) async {
         do {
-            let game = try await conclave.createGame(
-                name: gameName,
-                clerkUserId: clerkUserId
-            )
-            try await conclave
-                .connectToWebSocket(
-                    gameId: game.id,
-                    clerkUserId: clerkUserId
-                )
+            let game = try await conclave.createGame(name: gameName)
+            try await conclave.connectToWebSocket(gameId: game.id)
             screenPath.append(Screen.onlineGame)
         } catch {
             print("Failed to create game: \(error)")
         }
     }
 
-    private func joinGame(gameId: UUID, clerkUserId: String) async {
+    private func joinGame(gameId: UUID) async {
         do {
-            try await conclave
-                .connectToWebSocket(
-                    gameId: gameId,
-                    clerkUserId: clerkUserId
-                )
+            try await conclave.connectToWebSocket(gameId: gameId)
             let game = try await conclave.loadGame(gameId: gameId)
             print("HELLO! \(game.name)")
             do {
-                let _ = try await conclave.joinGame(
-                    gameId: game.id,
-                    clerkUserId: clerkUserId
-                )
+                let _ = try await conclave.joinGame(gameId: game.id)
             } catch {
                 print("Joining an existing game: \(error)")
             }

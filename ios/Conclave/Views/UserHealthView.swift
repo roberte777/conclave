@@ -1,5 +1,4 @@
 import ConclaveKit
-import Clerk
 import SwiftUI
 
 enum LifeOrientation: Double {
@@ -14,7 +13,6 @@ struct UserHealthView: View {
     var lifeOrientation: LifeOrientation
     var player: Player
     @Environment(ConclaveClientManager.self) private var conclave
-    @Environment(\.clerk) private var clerk
 
     init(
         _ player: Player,
@@ -174,7 +172,7 @@ struct UserHealthView: View {
                         .environment(conclave)
                     }
                 }
-                let healthText = Text("\(clerk.user?.username ?? "Unknown User")")
+                let healthText = Text(player.displayName)
                     .rotationEffect(Angle(degrees: lifeOrientation.rawValue))
                 switch lifeOrientation {
                 case .Up:
@@ -221,15 +219,9 @@ struct UserHealthView: View {
             .progressViewStyle(.circular)
             .task {
                 do {
-                    let game = try await mockManager.createGame(
-                        name: "MyGame",
-                        clerkUserId: "MyUser"
-                    )
-                    try await mockManager
-                        .connectToWebSocket(
-                            gameId: game.id,
-                            clerkUserId: "MyUser"
-                        )
+                    await mockManager.setAuthToken("mock_token")
+                    let game = try await mockManager.createGame(name: "MyGame")
+                    try await mockManager.connectToWebSocket(gameId: game.id)
                 } catch {
                     print("Failed to create game: \(error)")
                 }

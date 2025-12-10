@@ -42,15 +42,18 @@ Conclave is a real-time multiplayer Magic: The Gathering life tracker with three
 
 **Key Components**:
 - `src/main.rs` - Server setup and routing
-- `src/handlers.rs` - REST API endpoints
-- `src/websocket.rs` - Real-time WebSocket handling
+- `src/handlers.rs` - REST API endpoints (use JWT auth)
+- `src/websocket.rs` - Real-time WebSocket handling (JWT authenticated)
 - `src/models.rs` - Data structures and DTOs
 - `src/database.rs` - SQLite database layer
 - `src/state.rs` - Shared application state
+- `src/clerk.rs` - JWT validation and Clerk API integration
+- `src/auth.rs` - Authentication extractors for handlers
 
 **WebSocket Protocol**: Documented in `WEBSOCKET_PROTOCOL.md`
-- Client actions: updateLife, joinGame, leaveGame, getGameState, endGame
+- Client actions: updateLife, leaveGame, getGameState, endGame
 - Server broadcasts: lifeUpdate, playerJoined, playerLeft, gameStarted, gameEnded
+- Players are auto-joined on WebSocket connection with valid JWT
 
 ### 2. Web Frontend (conclave_web/)
 **Technology**: Next.js 15 + TypeScript + Tailwind + shadcn/ui + Clerk
@@ -89,24 +92,32 @@ Uses UUID primary keys and foreign key relationships for data integrity.
 ## Authentication & User Management
 
 - **Clerk Integration**: External authentication provider
-- **User References**: `clerk_user_id` field links to Clerk users
-- **No Local Users**: All user data managed by Clerk
+- **JWT Authentication**: All API requests and WebSocket connections require JWT tokens from Clerk
+- **Backend User Info**: Backend fetches user info (name, avatar) from Clerk API - clients don't need to
+- **No Local Users**: All user data managed by Clerk, referenced by `clerk_user_id`
 - **Multi-platform**: Same Clerk integration across web and mobile
 
 ## Real-time Communication
 
 **WebSocket Connection Requirements**:
-- Query parameters: `game_id` (UUID) and `clerk_user_id` (string)
-- Auto-join functionality when connecting
+- Query parameters: `gameId` (UUID) and `token` (JWT from Clerk)
+- JWT is validated and user info is extracted server-side
+- Auto-join functionality when connecting with valid token
 - Broadcast to all connected clients in same game
 - Connection cleanup on disconnect
 
 **Data Flow**:
-1. HTTP POST creates game and first player
-2. WebSocket connection with game_id + clerk_user_id
-3. Auto-join if player not already in game
-4. Real-time updates broadcast to all connected players
-5. Game end determines winner by highest life total
+1. Client obtains JWT token from Clerk
+2. HTTP POST with JWT creates game and first player
+3. WebSocket connection with gameId + JWT token
+4. Server validates JWT and auto-joins player if not in game
+5. Real-time updates broadcast to all connected players with user display info
+6. Game end determines winner by highest life total
+
+**Player Data Enrichment**:
+- Backend fetches user display info from Clerk API
+- Player objects include `displayName`, `username`, and `imageUrl`
+- Clients don't need to make separate calls to Clerk for user info
 
 ## Environment Setup
 
@@ -114,6 +125,13 @@ Uses UUID primary keys and foreign key relationships for data integrity.
 - Rust 1.70+ required
 - SQLite database (created automatically)
 - Runs on port 3001 by default
+- Environment variables:
+  ```
+  CLERK_SECRET_KEY=your_secret  # For JWT validation and Clerk API calls
+  CLERK_JWKS_URL=https://your-clerk-instance.clerk.accounts.dev/.well-known/jwks.json  # Optional: for JWKS validation
+  DATABASE_URL=sqlite:conclave.db?mode=rwc  # Optional: defaults to this
+  PORT=3001  # Optional: defaults to 3001
+  ```
 
 ### Frontend
 - Node.js 18+ and Bun package manager

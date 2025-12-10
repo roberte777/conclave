@@ -133,27 +133,9 @@ struct OnlineGameView: View {
             .progressViewStyle(.circular)
             .task {
                 do {
-                    let game = try await mockManager.createGame(
-                        name: "MyGame",
-                        clerkUserId: "MyUser"
-                    )
-                    try await mockManager
-                        .connectToWebSocket(
-                            gameId: game.id,
-                            clerkUserId: "MyUser"
-                        )
-                    _ = try await mockManager.joinGame(
-                        gameId: game.id,
-                        clerkUserId: "Guest1"
-                    )
-                    _ = try await mockManager.joinGame(
-                        gameId: game.id,
-                        clerkUserId: "Guest2"
-                    )
-                    _ = try await mockManager.joinGame(
-                        gameId: game.id,
-                        clerkUserId: "Guest3"
-                    )
+                    await mockManager.setAuthToken("mock_token")
+                    let game = try await mockManager.createGame(name: "MyGame")
+                    try await mockManager.connectToWebSocket(gameId: game.id)
                 } catch {
                     print("Failed to create game: \(error)")
                 }

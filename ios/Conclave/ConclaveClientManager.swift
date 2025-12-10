@@ -7,6 +7,7 @@ import SwiftUI
 /// and real-time updates. Automatically handles state synchronization and error recovery.
 ///
 /// Features:
+/// - JWT token-based authentication
 /// - Observable reactive state for SwiftUI integration
 /// - Automatic WebSocket connection management
 /// - Real-time state updates from server messages
@@ -19,6 +20,9 @@ public class ConclaveClientManager {
 
     /// The underlying ConclaveKit client for API and WebSocket communication
     private let client: ConclaveClient
+
+    /// Current authentication token
+    private var authToken: String?
 
     // MARK: - Observable Game State
 
@@ -62,6 +66,14 @@ public class ConclaveClientManager {
         self.init(client: client)
     }
 
+    // MARK: - Authentication
+
+    /// Set the authentication token for API and WebSocket requests
+    public func setAuthToken(_ token: String?) async {
+        self.authToken = token
+        await client.setAuthToken(token)
+    }
+
     // MARK: - State Management Helpers
     private func setLoading(_ loading: Bool) {
         isLoading = loading
@@ -90,8 +102,7 @@ public class ConclaveClientManager {
 
     public func createGame(
         name: String,
-        startingLife: Int32? = nil,
-        clerkUserId: String
+        startingLife: Int32? = nil
     ) async throws -> Game {
         setLoading(true)
         clearError()
@@ -99,8 +110,7 @@ public class ConclaveClientManager {
         do {
             let request = CreateGameRequest(
                 name: name,
-                startingLife: startingLife,
-                clerkUserId: clerkUserId
+                startingLife: startingLife
             )
             let game = try await client.createGame(request: request)
             currentGame = game
@@ -110,8 +120,8 @@ public class ConclaveClientManager {
             allPlayers = gameState.players.sorted { $0.position < $1.position }
             recentLifeChanges = Array(gameState.recentChanges.prefix(10))
 
-            // Set current player (the creator)
-            currentPlayer = allPlayers.first { $0.clerkUserId == clerkUserId }
+            // Set current player (the first player, who is the creator)
+            currentPlayer = allPlayers.first
 
             setLoading(false)
             return game
@@ -138,18 +148,12 @@ public class ConclaveClientManager {
         }
     }
 
-    public func joinGame(gameId: UUID, clerkUserId: String) async throws
-        -> Player
-    {
+    public func joinGame(gameId: UUID) async throws -> Player {
         setLoading(true)
         clearError()
 
         do {
-            let request = JoinGameRequest(clerkUserId: clerkUserId)
-            let player = try await client.joinGame(
-                gameId: gameId,
-                request: request
-            )
+            let player = try await client.joinGame(gameId: gameId)
             currentPlayer = player
 
             // Reload game to get updated state
@@ -166,13 +170,12 @@ public class ConclaveClientManager {
         }
     }
 
-    public func leaveGame(gameId: UUID, clerkUserId: String) async throws {
+    public func leaveGame(gameId: UUID) async throws {
         setLoading(true)
         clearError()
 
         do {
-            let request = JoinGameRequest(clerkUserId: clerkUserId)
-            try await client.leaveGame(gameId: gameId, request: request)
+            try await client.leaveGame(gameId: gameId)
 
             // Clear current player if leaving current game
             if currentGame?.id == gameId {
@@ -241,17 +244,20 @@ public class ConclaveClientManager {
 
     // MARK: - WebSocket Management
 
-    public func connectToWebSocket(gameId: UUID, clerkUserId: String)
-        async throws
-    {
+    public func connectToWebSocket(gameId: UUID) async throws {
         ConclaveLogger.shared.debug(
             "connectToWebSocket called for game: \(gameId)",
             category: .websocket
         )
+
+        guard let token = authToken else {
+            throw ConclaveError.authenticationFailed("No auth token set")
+        }
+
         // Disconnect any existing connection and wait for it to complete
         await disconnectFromWebSocketAsync()
 
-        try await client.connect(gameId: gameId, clerkUserId: clerkUserId)
+        try await client.connect(gameId: gameId, token: token)
         isConnectedToWebSocket = await client.isConnected
 
         // Start listening for WebSocket messages
@@ -358,7 +364,10 @@ public class ConclaveClientManager {
                 clerkUserId: oldPlayer.clerkUserId,
                 currentLife: message.newLife,
                 position: oldPlayer.position,
-                isEliminated: oldPlayer.isEliminated
+                isEliminated: oldPlayer.isEliminated,
+                displayName: oldPlayer.displayName,
+                username: oldPlayer.username,
+                imageUrl: oldPlayer.imageUrl
             )
 
             allPlayers[playerIndex] = updatedPlayer
@@ -497,14 +506,12 @@ public class ConclaveClientManager {
 
     // MARK: - Enhanced State Management
 
-    public func loadGameWithWebSocket(gameId: UUID, clerkUserId: String)
-        async throws -> Game
-    {
+    public func loadGameWithWebSocket(gameId: UUID) async throws -> Game {
         // First load the game via HTTP
         let game = try await loadGame(gameId: gameId)
 
         // Then connect to WebSocket for real-time updates
-        try await connectToWebSocket(gameId: gameId, clerkUserId: clerkUserId)
+        try await connectToWebSocket(gameId: gameId)
 
         // Load initial game state via WebSocket
         try await requestGameState()

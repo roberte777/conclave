@@ -1,3 +1,5 @@
+mod auth;
+mod clerk;
 mod database;
 mod errors;
 mod handlers;
@@ -7,7 +9,10 @@ mod websocket;
 
 use axum::{
     Router,
-    http::{Method, header::CONTENT_TYPE},
+    http::{
+        Method,
+        header::{AUTHORIZATION, CONTENT_TYPE},
+    },
     routing::{get, post, put},
 };
 use state::AppState;
@@ -22,6 +27,9 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // Load environment variables from .env if present (before reading any env vars)
+    let _ = dotenvy::dotenv();
+
     // Initialize tracing
     tracing_subscriber::registry()
         .with(
@@ -34,6 +42,9 @@ async fn main() -> anyhow::Result<()> {
 
     info!("🎯 Starting Conclave API Server...");
 
+    // Initialize Clerk client for JWT validation
+    clerk::ClerkClient::init()?;
+
     // Initialize database
     let db_pool = database::create_pool().await?;
     info!("✅ Database connected and migrations completed");
@@ -44,7 +55,7 @@ async fn main() -> anyhow::Result<()> {
     // Configure CORS
     let cors = CorsLayer::new()
         .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
-        .allow_headers([CONTENT_TYPE])
+        .allow_headers([AUTHORIZATION, CONTENT_TYPE])
         .allow_origin(Any);
 
     // Build the API v1 router
@@ -52,17 +63,11 @@ async fn main() -> anyhow::Result<()> {
         // Health and monitoring endpoints
         .route("/health", get(handlers::health_check))
         .route("/stats", get(handlers::get_stats))
-        // User endpoints (users managed by Clerk)
+        // User endpoints (authenticated via JWT - uses /users/me/ pattern)
+        .route("/users/me/history", get(handlers::get_user_history))
+        .route("/users/me/games", get(handlers::get_user_games))
         .route(
-            "/users/{clerk_user_id}/history",
-            get(handlers::get_user_history),
-        )
-        .route(
-            "/users/{clerk_user_id}/games",
-            get(handlers::get_user_games),
-        )
-        .route(
-            "/users/{clerk_user_id}/available-games",
+            "/users/me/available-games",
             get(handlers::get_available_games),
         )
         // Game endpoints
