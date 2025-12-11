@@ -29,6 +29,7 @@ import {
     Shield,
     Sparkles,
     X,
+    Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -62,7 +63,7 @@ const PLAYER_ACCENTS = [
 ];
 
 export function GamePageClient({ gameId }: GamePageClientProps) {
-    const { getToken } = useAuth();
+    const { getToken, userId } = useAuth();
     const api = useMemo(() => new ConclaveAPI({}), []);
 
     const [isConnected, setIsConnected] = useState(false);
@@ -74,6 +75,16 @@ export function GamePageClient({ gameId }: GamePageClientProps) {
     const [animatingLife, setAnimatingLife] = useState<Record<string, boolean>>({});
     const [showEndGameDialog, setShowEndGameDialog] = useState(false);
     const [selectedWinnerId, setSelectedWinnerId] = useState<string | null>(null);
+
+    // Sort players so the current user is first, then others by position
+    const sortedPlayers = useMemo(() => {
+        if (!state?.players) return [];
+        const currentUserPlayer = state.players.find(p => p.clerkUserId === userId);
+        const otherPlayers = state.players
+            .filter(p => p.clerkUserId !== userId)
+            .sort((a, b) => a.position - b.position);
+        return currentUserPlayer ? [currentUserPlayer, ...otherPlayers] : otherPlayers;
+    }, [state?.players, userId]);
 
     // Establish websocket connection and wire up handlers
     useEffect(() => {
@@ -393,13 +404,15 @@ export function GamePageClient({ gameId }: GamePageClientProps) {
                 ) : (
                     <div className={cn(
                         "grid gap-4 md:gap-6",
-                        state.players.length === 1 && "grid-cols-1 max-w-lg mx-auto",
-                        state.players.length === 2 && "grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto",
-                        state.players.length === 3 && "grid-cols-1 md:grid-cols-2 lg:grid-cols-3",
-                        state.players.length === 4 && "grid-cols-2 lg:grid-cols-4",
-                        state.players.length >= 5 && "grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                        // Always single column on mobile, then responsive grid on larger screens
+                        "grid-cols-1",
+                        sortedPlayers.length === 1 && "max-w-lg mx-auto",
+                        sortedPlayers.length === 2 && "md:grid-cols-2 max-w-4xl mx-auto",
+                        sortedPlayers.length === 3 && "md:grid-cols-2 lg:grid-cols-3",
+                        sortedPlayers.length === 4 && "md:grid-cols-2 lg:grid-cols-4",
+                        sortedPlayers.length >= 5 && "md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
                     )}>
-                        {state.players.map((player, index) => {
+                        {sortedPlayers.map((player, index) => {
                             const colorClass = PLAYER_COLORS[index % PLAYER_COLORS.length];
                             const accentClass = PLAYER_ACCENTS[index % PLAYER_ACCENTS.length];
                             const isExpanded = expandedPlayer === player.id;
@@ -447,35 +460,19 @@ export function GamePageClient({ gameId }: GamePageClientProps) {
                                                 </div>
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-1">
-                                            <Tooltip content={partnerEnabled[player.id] ? "Disable partner" : "Enable partner"} side="bottom">
-                                                <button
-                                                    onClick={() => togglePartner(player.id)}
-                                                    disabled={!isConnected}
-                                                    className={cn(
-                                                        "p-2 rounded-lg transition-all",
-                                                        partnerEnabled[player.id]
-                                                            ? "bg-primary/30 text-primary hover:bg-primary/40"
-                                                            : "bg-white/5 text-muted-foreground hover:bg-white/10 hover:text-foreground"
-                                                    )}
-                                                >
-                                                    <Shield className="w-4 h-4" />
-                                                </button>
-                                            </Tooltip>
-                                            <Tooltip content={isExpanded ? "Hide commander damage" : "Show commander damage"} side="bottom">
-                                                <button
-                                                    onClick={() => setExpandedPlayer(isExpanded ? null : player.id)}
-                                                    className={cn(
-                                                        "p-2 rounded-lg transition-all",
-                                                        isExpanded
-                                                            ? "bg-primary/30 text-primary hover:bg-primary/40"
-                                                            : "bg-white/5 text-muted-foreground hover:bg-white/10 hover:text-foreground"
-                                                    )}
-                                                >
-                                                    <Swords className="w-4 h-4" />
-                                                </button>
-                                            </Tooltip>
-                                        </div>
+                                        <Tooltip content={isExpanded ? "Hide settings" : "Player settings"} side="bottom">
+                                            <button
+                                                onClick={() => setExpandedPlayer(isExpanded ? null : player.id)}
+                                                className={cn(
+                                                    "p-2 rounded-lg transition-all",
+                                                    isExpanded
+                                                        ? "bg-primary/30 text-primary hover:bg-primary/40"
+                                                        : "bg-white/5 text-muted-foreground hover:bg-white/10 hover:text-foreground"
+                                                )}
+                                            >
+                                                <Settings className="w-4 h-4" />
+                                            </button>
+                                        </Tooltip>
                                     </div>
 
                                     {/* Life Counter Section */}
@@ -542,15 +539,44 @@ export function GamePageClient({ gameId }: GamePageClientProps) {
                                         </div>
                                     </div>
 
-                                    {/* Commander Damage Section (Expanded) */}
-                                    {isExpanded && state.players.length > 1 && (
+                                    {/* Player Settings Section (Expanded) */}
+                                    {isExpanded && (
                                         <div className="px-4 pb-4 md:px-6 md:pb-6 border-t border-white/10 pt-4 animate-fade-in-up">
+                                            {/* Partner Toggle */}
+                                            <div className="flex items-center justify-between mb-4 p-3 glass-card rounded-xl">
+                                                <div className="flex items-center gap-2">
+                                                    <Shield className="w-4 h-4 text-primary" />
+                                                    <span className="text-sm font-medium">Partner Commander</span>
+                                                </div>
+                                                <button
+                                                    onClick={() => togglePartner(player.id)}
+                                                    disabled={!isConnected}
+                                                    className={cn(
+                                                        "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                                                        partnerEnabled[player.id]
+                                                            ? "bg-primary"
+                                                            : "bg-white/20",
+                                                        !isConnected && "opacity-50 cursor-not-allowed"
+                                                    )}
+                                                >
+                                                    <span
+                                                        className={cn(
+                                                            "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+                                                            partnerEnabled[player.id] ? "translate-x-6" : "translate-x-1"
+                                                        )}
+                                                    />
+                                                </button>
+                                            </div>
+
+                                            {/* Commander Damage Section */}
+                                            {sortedPlayers.length > 1 && (
+                                            <>
                                             <div className="text-sm font-medium mb-3 flex items-center gap-2">
                                                 <Swords className="w-4 h-4 text-orange-400" />
                                                 Incoming Commander Damage
                                             </div>
                                             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                                                {state.players
+                                                {sortedPlayers
                                                     .filter((from) => from.id !== player.id)
                                                     .map((from, fromIndex) => (
                                                         <div
@@ -616,6 +642,8 @@ export function GamePageClient({ gameId }: GamePageClientProps) {
                                                         </div>
                                                     ))}
                                             </div>
+                                            </>
+                                            )}
                                         </div>
                                     )}
                                 </div>
