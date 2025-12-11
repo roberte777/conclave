@@ -5,9 +5,7 @@ struct ContentView: View {
     @Environment(ConclaveClientManager.self) private var conclave
 
     // Test user info
-    @State private var gameName = "Test MTG Game"
     @State private var startingLife: Int32 = 40
-    @State private var clerkUserId = "user_2zntWzmf6m7VBdndik9DBeO6KO8"
 
     // Life change controls
     @State private var lifeChangeAmount: Int32 = -1
@@ -15,7 +13,6 @@ struct ContentView: View {
 
     // UI State
     @State private var showingCreateGame = false
-    @State private var showingJoinGame = false
 
     var body: some View {
         NavigationView {
@@ -56,9 +53,6 @@ struct ContentView: View {
         .sheet(isPresented: $showingCreateGame) {
             createGameSheet
         }
-        .sheet(isPresented: $showingJoinGame) {
-            joinGameSheet
-        }
     }
 
     // MARK: - Header Section
@@ -72,13 +66,6 @@ struct ContentView: View {
             Text("Test the full game flow with WebSocket updates")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
-
-            HStack {
-                Label("User ID: \(clerkUserId)", systemImage: "person.fill")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                Spacer()
-            }
         }
         .padding()
         .background(Color(.systemGray6))
@@ -121,7 +108,7 @@ struct ContentView: View {
             // Current Game Info
             if let game = conclave.currentGame {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("📋 \(game.name)")
+                    Text("📋 Game #\(game.id.uuidString.prefix(8))")
                         .font(.subheadline)
                         .fontWeight(.medium)
 
@@ -152,39 +139,17 @@ struct ContentView: View {
                 .font(.headline)
 
             if conclave.currentGame == nil {
-                // No game - show create/join options
+                // No game - show create option
                 VStack(spacing: 8) {
                     Button("🎮 Create New Game") {
                         showingCreateGame = true
                     }
                     .buttonStyle(.borderedProminent)
                     .disabled(conclave.isLoading)
-
-                    Button("👥 Join Existing Game") {
-                        showingJoinGame = true
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(conclave.isLoading)
                 }
             } else {
                 // Has game - show game management options
                 VStack(spacing: 8) {
-                    if !conclave.isConnectedToWebSocket {
-                        Button("🔌 Connect to WebSocket") {
-                            connectToWebSocket()
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(conclave.isLoading)
-                    }
-
-                    if conclave.currentPlayer == nil {
-                        Button("➕ Join This Game") {
-                            joinCurrentGame()
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(conclave.isLoading)
-                    }
-
                     HStack(spacing: 8) {
                         Button("🔄 Refresh Game State") {
                             refreshGameState()
@@ -202,20 +167,12 @@ struct ContentView: View {
                         .disabled(conclave.isLoading)
                     }
 
-                    HStack(spacing: 8) {
-                        Button("🤖 Add Test Players") {
-                            addTestPlayers()
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(conclave.isLoading)
-
-                        Button("🏁 End Game") {
-                            endGame()
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(.red)
-                        .disabled(conclave.isLoading)
+                    Button("🏁 End Game") {
+                        endGame()
                     }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.red)
+                    .disabled(conclave.isLoading)
                 }
             }
         }
@@ -423,18 +380,12 @@ struct ContentView: View {
         NavigationView {
             Form {
                 Section("Game Details") {
-                    TextField("Game Name", text: $gameName)
-
                     Stepper(
                         "Starting Life: \(startingLife)",
                         value: $startingLife,
                         in: 1...100,
                         step: 1
                     )
-                }
-
-                Section("Player Info") {
-                    TextField("Your User ID", text: $clerkUserId)
                 }
             }
             .navigationTitle("Create Game")
@@ -450,32 +401,8 @@ struct ContentView: View {
                     Button("Create") {
                         createGame()
                     }
-                    .disabled(gameName.isEmpty || clerkUserId.isEmpty)
                 }
             }
-        }
-    }
-
-    private var joinGameSheet: some View {
-        NavigationView {
-            VStack(spacing: 20) {
-                Text("Join Game")
-                    .font(.title2)
-                    .fontWeight(.bold)
-
-                Text("Feature not implemented yet")
-                    .foregroundColor(.secondary)
-
-                Text("For testing, create a new game instead")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-
-                Button("Cancel") {
-                    showingJoinGame = false
-                }
-                .buttonStyle(.bordered)
-            }
-            .padding()
         }
     }
 
@@ -485,51 +412,16 @@ struct ContentView: View {
         Task {
             do {
                 let game = try await conclave.createGame(
-                    name: gameName,
-                    startingLife: startingLife,
-                    clerkUserId: clerkUserId
+                    startingLife: startingLife
                 )
 
                 showingCreateGame = false
 
-                // Auto-connect to WebSocket (game state is already loaded)
-                try await conclave.connectToWebSocket(
-                    gameId: game.id,
-                    clerkUserId: clerkUserId
-                )
+                // Auto-connect to WebSocket
+                try await conclave.connectToWebSocket(gameId: game.id)
 
             } catch {
                 print("Failed to create game: \(error)")
-            }
-        }
-    }
-
-    private func connectToWebSocket() {
-        guard let game = conclave.currentGame else { return }
-
-        Task {
-            do {
-                try await conclave.connectToWebSocket(
-                    gameId: game.id,
-                    clerkUserId: clerkUserId
-                )
-            } catch {
-                print("Failed to connect to WebSocket: \(error)")
-            }
-        }
-    }
-
-    private func joinCurrentGame() {
-        guard let game = conclave.currentGame else { return }
-
-        Task {
-            do {
-                _ = try await conclave.joinGame(
-                    gameId: game.id,
-                    clerkUserId: clerkUserId
-                )
-            } catch {
-                print("Failed to join game: \(error)")
             }
         }
     }
@@ -549,11 +441,7 @@ struct ContentView: View {
 
         Task {
             do {
-                try await conclave.leaveGame(
-                    gameId: game.id,
-                    clerkUserId: clerkUserId
-                )
-
+                try await conclave.leaveGame(gameId: game.id)
                 conclave.clearCurrentGame()
             } catch {
                 print("Failed to leave game: \(error)")
@@ -562,11 +450,9 @@ struct ContentView: View {
     }
 
     private func endGame() {
-        guard let game = conclave.currentGame else { return }
-
         Task {
             do {
-                _ = try await conclave.endGame(gameId: game.id)
+                try await conclave.sendEndGame(winnerPlayerId: nil)
             } catch {
                 print("Failed to end game: \(error)")
             }
@@ -582,39 +468,6 @@ struct ContentView: View {
                 )
             } catch {
                 print("Failed to update life: \(error)")
-            }
-        }
-    }
-
-    private func addTestPlayers() {
-        guard let game = conclave.currentGame else { return }
-
-        Task {
-            do {
-                // Add 2-3 additional test players to simulate a multiplayer game
-                let testUserIds = [
-                    "test_player_alice",
-                    "test_player_bob",
-                    "test_player_charlie",
-                ]
-
-                for userId in testUserIds {
-                    do {
-                        _ = try await conclave.joinGame(
-                            gameId: game.id,
-                            clerkUserId: userId
-                        )
-                    } catch {
-                        // Ignore errors for test players (they might already be in game)
-                        print("Could not add test player \(userId): \(error)")
-                    }
-                }
-
-                // Refresh game state to see all players
-                try await conclave.requestGameState()
-
-            } catch {
-                print("Failed to add test players: \(error)")
             }
         }
     }

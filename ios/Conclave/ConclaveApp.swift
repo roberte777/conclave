@@ -23,7 +23,7 @@ struct ConclaveApp: App {
             .environment(\.clerk, clerk)
             .task {
                 if !clerk.isLoaded {
-                    clerk.configure(publishableKey: "pk_test_ZmFuY3ktY291Z2FyLTg4LmNsZXJrLmFjY291bnRzLmRldiQ")
+                    clerk.configure(publishableKey: "pk_test_aGFyZHktbGFiLTUuY2xlcmsuYWNjb3VudHMuZGV2JA")
                     try? await clerk.load()
                 }
             }

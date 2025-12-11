@@ -220,7 +220,7 @@ struct UserHealthView: View {
             .task {
                 do {
                     await mockManager.setAuthToken("mock_token")
-                    let game = try await mockManager.createGame(name: "MyGame")
+                    let game = try await mockManager.createGame(startingLife: 40)
                     try await mockManager.connectToWebSocket(gameId: game.id)
                 } catch {
                     print("Failed to create game: \(error)")

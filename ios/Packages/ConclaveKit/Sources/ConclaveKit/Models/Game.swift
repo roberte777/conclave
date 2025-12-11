@@ -2,7 +2,6 @@ import Foundation
 
 public struct Game: Codable, Equatable, Identifiable, Sendable {
     public let id: UUID
-    public let name: String
     public let status: GameStatus
     public let startingLife: Int32
     public let winnerPlayerId: UUID?
@@ -11,7 +10,6 @@ public struct Game: Codable, Equatable, Identifiable, Sendable {
 
     public init(
         id: UUID,
-        name: String,
         status: GameStatus,
         startingLife: Int32,
         winnerPlayerId: UUID? = nil,
@@ -19,7 +17,6 @@ public struct Game: Codable, Equatable, Identifiable, Sendable {
         finishedAt: Date? = nil
     ) {
         self.id = id
-        self.name = name
         self.status = status
         self.startingLife = startingLife
         self.winnerPlayerId = winnerPlayerId

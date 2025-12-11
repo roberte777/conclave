@@ -1,11 +1,9 @@
 import Foundation
 
 public struct CreateGameRequest: Codable, Sendable {
-    public let name: String
     public let startingLife: Int32?
 
-    public init(name: String, startingLife: Int32? = nil) {
-        self.name = name
+    public init(startingLife: Int32? = nil) {
         self.startingLife = startingLife
     }
 }

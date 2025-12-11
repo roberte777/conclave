@@ -174,7 +174,6 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
 
             game = Game(
                 id: game.id,
-                name: game.name,
                 status: .finished,
                 startingLife: game.startingLife,
                 createdAt: game.createdAt,
@@ -257,32 +256,42 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
         let clerkUserId = await mockState.getMockUserId()
 
         // Generate mock game history
-        let mockGames = (0..<3).map { i in
+        let mockGames: [GameWithPlayers] = (0..<3).map { i -> GameWithPlayers in
             let gameId = generateMockGameId()
+            let timeOffset = Double(i * 3600)
+            let createdDate = Date().addingTimeInterval(-timeOffset)
+            let finishedDate = Date().addingTimeInterval(-timeOffset + 1800)
+            
             let game = Game(
                 id: gameId,
-                name: "Mock Game \(i + 1)",
                 status: .finished,
                 startingLife: 40,
-                createdAt: Date().addingTimeInterval(-Double(i * 3600)),
-                finishedAt: Date().addingTimeInterval(-Double(i * 3600 - 1800))
+                createdAt: createdDate,
+                finishedAt: finishedDate
             )
 
-            let mockPlayers = (0..<2).map { j in
-                Player(
-                    id: generateMockPlayerId(),
+            let mockPlayers: [Player] = (0..<2).map { j -> Player in
+                let playerId = generateMockPlayerId()
+                let userId = j == 0 ? clerkUserId : "mock_opponent_\(j)"
+                let displayName = j == 0 ? "You" : "Opponent \(j)"
+                let currentLife = Int32.random(in: 0...40)
+                let position = Int32(j + 1)
+                
+                return Player(
+                    id: playerId,
                     gameId: gameId,
-                    clerkUserId: j == 0 ? clerkUserId : "mock_opponent_\(j)",
-                    currentLife: Int32.random(in: 0...40),
-                    position: Int32(j + 1),
-                    displayName: j == 0 ? "You" : "Opponent \(j)"
+                    clerkUserId: userId,
+                    currentLife: currentLife,
+                    position: position,
+                    displayName: displayName
                 )
             }
 
+            let winner = mockPlayers.randomElement()
             return GameWithPlayers(
                 game: game,
                 players: mockPlayers,
-                winner: mockPlayers.randomElement()
+                winner: winner
             )
         }
 
@@ -301,7 +310,6 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
         // Return mock active games
         let mockGame = Game(
             id: generateMockGameId(),
-            name: "Active Mock Game",
             status: .active,
             startingLife: 40,
             createdAt: Date().addingTimeInterval(-300),
@@ -327,7 +335,6 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
         // Return mock available games
         let mockGame = Game(
             id: generateMockGameId(),
-            name: "Available Mock Game",
             status: .active,
             startingLife: 40,
             createdAt: Date().addingTimeInterval(-600),
@@ -352,7 +359,6 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
         // Return mock available games
         let mockGame1 = Game(
             id: generateMockGameId(),
-            name: "Mock Game 1",
             status: .active,
             startingLife: 40,
             createdAt: Date().addingTimeInterval(-600),
@@ -361,7 +367,6 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
 
         let mockGame2 = Game(
             id: generateMockGameId(),
-            name: "Mock Game 2",
             status: .active,
             startingLife: 60,
             createdAt: Date().addingTimeInterval(-800),
@@ -370,7 +375,6 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
 
         let mockGame3 = Game(
             id: generateMockGameId(),
-            name: "Mock Game 3",
             status: .finished,
             startingLife: 40,
             createdAt: Date().addingTimeInterval(-800),
@@ -418,7 +422,6 @@ public final class MockConclaveClient: ConclaveClient, Sendable {
 
         let game = Game(
             id: gameId,
-            name: request.name,
             status: .active,
             startingLife: request.startingLife ?? 40,
             createdAt: Date(),

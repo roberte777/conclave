@@ -47,6 +47,15 @@ public class ConclaveClientManager {
     /// Recent life changes for activity feed (limited to prevent memory growth)
     public var recentLifeChanges: [LifeChange] = []
 
+    /// Commander damage tracking
+    public var commanderDamage: [CommanderDamage] = []
+    
+    /// Partner enabled status for each player
+    public var partnerEnabled: [UUID: Bool] = [:]
+    
+    /// Winner of the current game (set when game ends)
+    public var winner: Player?
+
     /// WebSocket connection status
     public var isConnectedToWebSocket = false
 
@@ -101,7 +110,6 @@ public class ConclaveClientManager {
     }
 
     public func createGame(
-        name: String,
         startingLife: Int32? = nil
     ) async throws -> Game {
         setLoading(true)
@@ -109,7 +117,6 @@ public class ConclaveClientManager {
 
         do {
             let request = CreateGameRequest(
-                name: name,
                 startingLife: startingLife
             )
             let game = try await client.createGame(request: request)
@@ -221,12 +228,12 @@ public class ConclaveClientManager {
         }
     }
 
-    public func endGame(gameId: UUID) async throws -> Game {
+    public func endGame(gameId: UUID, winnerPlayerId: UUID? = nil) async throws -> Game {
         setLoading(true)
         clearError()
 
         do {
-            let game = try await client.endGame(gameId: gameId)
+            let game = try await client.endGame(gameId: gameId, winnerPlayerId: winnerPlayerId)
 
             // Update current game if it matches
             if currentGame?.id == gameId {
@@ -429,27 +436,38 @@ public class ConclaveClientManager {
 
     @MainActor
     private func handleGameStarted(_ message: GameStartedMessage) {
+        // Update game
+        currentGame = message.game
+        
         // Update our players list with the initial game state
         allPlayers = message.players.sorted { $0.position < $1.position }
+        
+        // Update commander damage
+        commanderDamage = message.commanderDamage
+        
+        // Update recent changes
+        recentLifeChanges = Array(message.recentChanges.prefix(10))
     }
 
     @MainActor
     private func handleGameEnded(_ message: GameEndedMessage) {
+        // Set the winner
+        winner = message.winner
+        
         // Update game status to finished
         if var game = currentGame {
             game = Game(
                 id: game.id,
-                name: game.name,
                 status: .finished,
                 startingLife: game.startingLife,
+                winnerPlayerId: message.winner?.id,
                 createdAt: game.createdAt,
-                finishedAt: game.finishedAt
+                finishedAt: Date()
             )
             currentGame = game
         }
 
-        // Disconnect from WebSocket since game is over
-        disconnectFromWebSocket()
+        // Note: Don't disconnect automatically - let user view final state
     }
 
     @MainActor
@@ -461,8 +479,39 @@ public class ConclaveClientManager {
     private func handleCommanderDamageUpdate(
         _ message: CommanderDamageUpdateMessage
     ) {
-        // Log commander damage update for now
-        // In a full implementation, this would update commander damage state
+        // Find and update existing commander damage, or create new one
+        if let index = commanderDamage.firstIndex(where: {
+            $0.fromPlayerId == message.fromPlayerId &&
+            $0.toPlayerId == message.toPlayerId &&
+            $0.commanderNumber == message.commanderNumber
+        }) {
+            // Update existing
+            let existing = commanderDamage[index]
+            commanderDamage[index] = CommanderDamage(
+                id: existing.id,
+                gameId: message.gameId,
+                fromPlayerId: message.fromPlayerId,
+                toPlayerId: message.toPlayerId,
+                commanderNumber: message.commanderNumber,
+                damage: message.newDamage,
+                createdAt: existing.createdAt,
+                updatedAt: Date()
+            )
+        } else {
+            // Create new
+            let newDamage = CommanderDamage(
+                id: UUID(),
+                gameId: message.gameId,
+                fromPlayerId: message.fromPlayerId,
+                toPlayerId: message.toPlayerId,
+                commanderNumber: message.commanderNumber,
+                damage: message.newDamage,
+                createdAt: Date(),
+                updatedAt: Date()
+            )
+            commanderDamage.append(newDamage)
+        }
+        
         ConclaveLogger.shared.logStateChange(
             "Commander damage updated",
             details:
@@ -472,8 +521,9 @@ public class ConclaveClientManager {
 
     @MainActor
     private func handlePartnerToggled(_ message: PartnerToggledMessage) {
-        // Log partner toggle for now
-        // In a full implementation, this would update player partner status
+        // Update partner status for the player
+        partnerEnabled[message.playerId] = message.hasPartner
+        
         ConclaveLogger.shared.logStateChange(
             "Partner toggled",
             details:
@@ -502,6 +552,63 @@ public class ConclaveClientManager {
 
         try await client.getGameState()
     }
+    
+    public func sendEndGame(winnerPlayerId: UUID?) async throws {
+        guard isConnectedToWebSocket else {
+            throw ConclaveError.notConnected
+        }
+        
+        try await client.endGame(winnerPlayerId: winnerPlayerId)
+    }
+    
+    public func sendCommanderDamageUpdate(
+        fromPlayerId: UUID,
+        toPlayerId: UUID,
+        commanderNumber: Int32,
+        damageAmount: Int32
+    ) async throws {
+        guard isConnectedToWebSocket else {
+            throw ConclaveError.notConnected
+        }
+        
+        try await client.updateCommanderDamage(
+            fromPlayerId: fromPlayerId,
+            toPlayerId: toPlayerId,
+            commanderNumber: commanderNumber,
+            damageAmount: damageAmount
+        )
+    }
+    
+    public func sendTogglePartner(playerId: UUID, enablePartner: Bool) async throws {
+        guard isConnectedToWebSocket else {
+            throw ConclaveError.notConnected
+        }
+        
+        try await client.togglePartner(playerId: playerId, enablePartner: enablePartner)
+    }
+    
+    // MARK: - Helper Methods
+    
+    /// Get commander damage from a specific player to another
+    public func getCommanderDamage(fromPlayerId: UUID, toPlayerId: UUID, commanderNumber: Int32) -> Int32 {
+        commanderDamage.first(where: {
+            $0.fromPlayerId == fromPlayerId &&
+            $0.toPlayerId == toPlayerId &&
+            $0.commanderNumber == commanderNumber
+        })?.damage ?? 0
+    }
+    
+    /// Get total commander damage received by a player
+    public func getTotalCommanderDamage(toPlayerId: UUID) -> Int32 {
+        commanderDamage
+            .filter { $0.toPlayerId == toPlayerId }
+            .reduce(0) { $0 + $1.damage }
+    }
+    
+    /// Check if a player has partner enabled
+    public func hasPartner(playerId: UUID) -> Bool {
+        partnerEnabled[playerId] ?? false
+    }
 
     // MARK: - Enhanced State Management
 
@@ -525,6 +632,9 @@ public class ConclaveClientManager {
         currentPlayer = nil
         allPlayers = []
         recentLifeChanges = []
+        commanderDamage = []
+        partnerEnabled = [:]
+        winner = nil
         disconnectFromWebSocket()
     }
 
