@@ -428,8 +428,8 @@ export function GamePageClient({ gameId }: GamePageClientProps) {
                         "grid-cols-1",
                         sortedPlayers.length === 1 && "max-w-lg mx-auto",
                         sortedPlayers.length === 2 && "md:grid-cols-2 max-w-4xl mx-auto",
-                        sortedPlayers.length === 3 && "md:grid-cols-2 lg:grid-cols-3",
-                        sortedPlayers.length === 4 && "md:grid-cols-2 lg:grid-cols-4",
+                        sortedPlayers.length === 3 && "md:grid-cols-2 xl:grid-cols-3",
+                        sortedPlayers.length === 4 && "md:grid-cols-2 xl:grid-cols-4",
                         sortedPlayers.length >= 5 && "md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
                     )}>
                         {sortedPlayers.map((player, index) => {
