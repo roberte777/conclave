@@ -5,8 +5,11 @@ import type { ConclaveAPIConfig, WebSocketMessage, GameState } from "./index";
 export interface UseConclaveOptions extends ConclaveAPIConfig {
   autoConnect?: boolean;
   gameId?: string;
-  /** JWT token for authentication */
-  token?: string;
+  /**
+   * Function to get a fresh JWT token. Called on initial connection and before
+   * each reconnection to ensure the token is valid for long-lived connections.
+   */
+  getToken?: () => Promise<string>;
 }
 
 export interface ConclaveState {
@@ -22,7 +25,7 @@ export function useConclave(options: UseConclaveOptions = {}): ConclaveState {
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [lastMessage, setLastMessage] = useState<WebSocketMessage | null>(null);
   const [error, setError] = useState<Error | null>(null);
-  
+
   const apiRef = useRef<ConclaveAPI | null>(null);
 
   if (!apiRef.current) {
@@ -35,10 +38,10 @@ export function useConclave(options: UseConclaveOptions = {}): ConclaveState {
 
   useEffect(() => {
     const api = apiRef.current!;
-    
-    if (options.autoConnect !== false && options.gameId && options.token) {
-      const ws = api.connectWebSocket(options.gameId, options.token);
-      
+
+    if (options.autoConnect !== false && options.gameId && options.getToken) {
+      const ws = api.connectWebSocket(options.gameId, options.getToken);
+
       const unsubConnect = ws.onConnect(() => {
         setIsConnected(true);
         setError(null);
@@ -55,7 +58,7 @@ export function useConclave(options: UseConclaveOptions = {}): ConclaveState {
 
       const unsubMessage = ws.on("*", (message) => {
         setLastMessage(message);
-        
+
         if (message.type === "gameStarted") {
           setGameState({
             game: message.game,
@@ -74,7 +77,7 @@ export function useConclave(options: UseConclaveOptions = {}): ConclaveState {
         api.disconnectWebSocket();
       };
     }
-  }, [options.gameId, options.token, options.autoConnect]);
+  }, [options.gameId, options.getToken, options.autoConnect]);
 
   return {
     api: apiRef.current!,
@@ -92,10 +95,10 @@ export function useGameState(gameId: string | undefined) {
 
   const fetchGameState = useCallback(async (api: ConclaveAPI) => {
     if (!gameId) return;
-    
+
     setLoading(true);
     setError(null);
-    
+
     try {
       const state = await api.http.getGameState(gameId);
       setGameState(state);
