@@ -234,7 +234,7 @@ export function PodFilter({
 
             {filteredPlayers.length === 0 && searchValue && (
               <p className="text-sm text-muted-foreground text-center py-4">
-                No players found matching "{searchValue}"
+                No players found matching &quot;{searchValue}&quot;
               </p>
             )}
           </div>

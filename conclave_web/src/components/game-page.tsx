@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
     Dialog,
     DialogContent,
@@ -67,7 +66,8 @@ export function GamePageClient({ gameId }: GamePageClientProps) {
     const api = useMemo(() => new ConclaveAPI({}), []);
 
     const [isConnected, setIsConnected] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    // Reserve the full-screen error UI for non-recoverable errors (e.g. auth failure).
+    const [fatalError, setFatalError] = useState<string | null>(null);
     const [state, setState] = useState<GameState | null>(null);
     const [partnerEnabled, setPartnerEnabled] = useState<PartnerState>({});
     const [winner, setWinner] = useState<Player | null>(null);
@@ -91,10 +91,13 @@ export function GamePageClient({ gameId }: GamePageClientProps) {
         let ws: ReturnType<typeof api.connectWebSocket> | null = null;
         let cleanupFunctions: (() => void)[] = [];
 
+        const isAuthErrorMessage = (message: string) =>
+            /auth|unauthor|token/i.test(message);
+
         const connect = async () => {
             const token = await getToken({ template: "default" });
             if (!token) {
-                setError("Not authenticated");
+                setFatalError("Not authenticated");
                 return;
             }
 
@@ -102,7 +105,7 @@ export function GamePageClient({ gameId }: GamePageClientProps) {
 
             const offConnect = ws.onConnect(() => {
                 setIsConnected(true);
-                setError(null);
+                setFatalError(null);
                 ws?.getGameState();
             });
 
@@ -111,7 +114,15 @@ export function GamePageClient({ gameId }: GamePageClientProps) {
             });
 
             const offError = ws.onError((e) => {
-                setError(e.message || "WebSocket error");
+                // Avoid kicking the user out to a full-screen error for transient socket issues.
+                // If reconnection exhausts attempts, the client will emit a "Failed to reconnect"
+                // error; still keep the UI in-place so users can recover by returning online.
+                const message = e.message || "WebSocket error";
+                if (isAuthErrorMessage(message)) {
+                    setFatalError(message);
+                } else {
+                    console.warn("WebSocket error (non-fatal):", message);
+                }
             });
 
             const offAll = ws.on("*", (message) => {
@@ -209,7 +220,13 @@ export function GamePageClient({ gameId }: GamePageClientProps) {
                         break;
                     }
                     case "error": {
-                        setError(message.message);
+                        // Server-side errors might be actionable, but avoid a full-screen takeover
+                        // for transient connectivity-related messages.
+                        if (isAuthErrorMessage(message.message)) {
+                            setFatalError(message.message);
+                        } else {
+                            console.warn("WebSocket server error (non-fatal):", message.message);
+                        }
                         break;
                     }
                 }
@@ -283,7 +300,7 @@ export function GamePageClient({ gameId }: GamePageClientProps) {
         [state]
     );
 
-    if (error) {
+    if (fatalError) {
         return (
             <div className="min-h-screen bg-gradient-mesh flex items-center justify-center p-4">
                 <div className="glass-card rounded-2xl p-8 max-w-md w-full text-center animate-fade-in-up">
@@ -291,7 +308,7 @@ export function GamePageClient({ gameId }: GamePageClientProps) {
                         <X className="w-8 h-8 text-red-400" />
                     </div>
                     <h2 className="text-2xl font-bold mb-3">Connection Error</h2>
-                    <p className="text-muted-foreground mb-6">{error}</p>
+                    <p className="text-muted-foreground mb-6">{fatalError}</p>
                     <div className="flex gap-3 justify-center">
                         <Button asChild variant="outline">
                             <Link href="/">

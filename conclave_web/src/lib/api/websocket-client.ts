@@ -11,6 +11,12 @@ export interface WebSocketClientConfig {
   token: string;
   reconnectInterval?: number;
   maxReconnectAttempts?: number;
+  /**
+   * Mobile browsers (especially iOS Safari) routinely suspend/kill WebSockets when the tab is
+   * backgrounded. When enabled, we pause reconnection attempts while hidden and reconnect
+   * immediately when the page becomes visible again.
+   */
+  pauseReconnectWhileHidden?: boolean;
 }
 
 export class WebSocketClient {
@@ -24,21 +30,36 @@ export class WebSocketClient {
   private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
   private isIntentionallyClosed = false;
   private messageQueue: WebSocketRequest[] = [];
+  private shouldReconnectOnVisible = false;
+  private visibilityListenerInstalled = false;
+  private handleVisibilityChangeBound = () => this.handleVisibilityChange();
 
   constructor(config: WebSocketClientConfig) {
     this.config = {
       reconnectInterval: 3000,
       maxReconnectAttempts: 10,
+      pauseReconnectWhileHidden: true,
       ...config,
     };
   }
 
   connect(): void {
-    if (this.ws?.readyState === WebSocket.OPEN) {
+    if (
+      this.ws?.readyState === WebSocket.OPEN ||
+      this.ws?.readyState === WebSocket.CONNECTING
+    ) {
       return;
     }
 
     this.isIntentionallyClosed = false;
+
+    if (this.config.pauseReconnectWhileHidden && this.isPageHidden()) {
+      // Defer connecting until the page becomes visible again.
+      this.shouldReconnectOnVisible = true;
+      this.ensureVisibilityListener();
+      return;
+    }
+
     const wsUrl = new URL(this.config.url);
     // Server expects camelCase query params per serde rename_all = "camelCase"
     wsUrl.searchParams.set("gameId", this.config.gameId);
@@ -48,6 +69,7 @@ export class WebSocketClient {
     try {
       this.ws = new WebSocket(wsUrl.toString());
       this.setupEventListeners();
+      this.ensureVisibilityListener();
     } catch (error) {
       this.handleError(error as Error);
     }
@@ -79,13 +101,20 @@ export class WebSocketClient {
       this.disconnectionHandlers.forEach((handler) => handler());
 
       if (!this.isIntentionallyClosed) {
+        if (this.config.pauseReconnectWhileHidden && this.isPageHidden()) {
+          // Mobile browsers may close sockets when backgrounded; don't treat this as a failure.
+          this.shouldReconnectOnVisible = true;
+          this.ensureVisibilityListener();
+          return;
+        }
         this.attemptReconnect();
       }
     };
 
     this.ws.onerror = (event) => {
       console.error("WebSocket error:", event);
-      this.handleError(new Error("WebSocket connection error"));
+      // Avoid surfacing generic socket errors to UI; reconnection (or visibility resume)
+      // is handled via onclose/attemptReconnect.
     };
   }
 
@@ -110,6 +139,12 @@ export class WebSocketClient {
   }
 
   private attemptReconnect(): void {
+    if (this.config.pauseReconnectWhileHidden && this.isPageHidden()) {
+      this.shouldReconnectOnVisible = true;
+      this.ensureVisibilityListener();
+      return;
+    }
+
     if (this.reconnectAttempts >= this.config.maxReconnectAttempts) {
       console.error("Max reconnection attempts reached");
       this.handleError(new Error("Failed to reconnect to WebSocket"));
@@ -137,6 +172,7 @@ export class WebSocketClient {
 
   disconnect(): void {
     this.isIntentionallyClosed = true;
+    this.shouldReconnectOnVisible = false;
 
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
@@ -147,6 +183,8 @@ export class WebSocketClient {
       this.ws.close();
       this.ws = null;
     }
+
+    this.teardownVisibilityListener();
   }
 
   send(request: WebSocketRequest): void {
@@ -267,5 +305,38 @@ export class WebSocketClient {
 
   get connectionState(): number {
     return this.ws?.readyState ?? WebSocket.CLOSED;
+  }
+
+  private isPageHidden(): boolean {
+    if (typeof document === "undefined") return false;
+    return document.visibilityState === "hidden";
+  }
+
+  private ensureVisibilityListener(): void {
+    if (!this.config.pauseReconnectWhileHidden) return;
+    if (typeof document === "undefined") return;
+    if (this.visibilityListenerInstalled) return;
+
+    document.addEventListener("visibilitychange", this.handleVisibilityChangeBound);
+    this.visibilityListenerInstalled = true;
+  }
+
+  private teardownVisibilityListener(): void {
+    if (typeof document === "undefined") return;
+    if (!this.visibilityListenerInstalled) return;
+
+    document.removeEventListener("visibilitychange", this.handleVisibilityChangeBound);
+    this.visibilityListenerInstalled = false;
+  }
+
+  private handleVisibilityChange(): void {
+    if (!this.config.pauseReconnectWhileHidden) return;
+    if (this.isIntentionallyClosed) return;
+    if (this.isPageHidden()) return;
+
+    if (this.shouldReconnectOnVisible) {
+      this.shouldReconnectOnVisible = false;
+      this.connect();
+    }
   }
 }
