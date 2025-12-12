@@ -49,6 +49,7 @@ struct ContentView: View {
             }
             .navigationTitle("Conclave Test")
             .navigationBarTitleDisplayMode(.large)
+            .toolbarColorScheme(.dark, for: .navigationBar)
         }
         .sheet(isPresented: $showingCreateGame) {
             createGameSheet
@@ -390,6 +391,7 @@ struct ContentView: View {
             }
             .navigationTitle("Create Game")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {

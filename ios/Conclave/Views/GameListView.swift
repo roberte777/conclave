@@ -647,6 +647,7 @@ struct CreateGameSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color.conclaveBackground.opacity(0.9), for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {

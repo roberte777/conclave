@@ -188,6 +188,7 @@ struct GameSettingsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Color.conclaveBackground.opacity(0.9), for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
         .sheet(isPresented: $showEndGameSheet) {
             EndGameSettingsSheet(
                 players: conclave.allPlayers,
@@ -471,6 +472,7 @@ struct EndGameSettingsSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color.conclaveBackground.opacity(0.9), for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
         }
     }
 }

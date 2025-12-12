@@ -4,11 +4,8 @@ import SwiftUI
 struct OnlineGameView: View {
     @Binding var screenPath: NavigationPath
     @Environment(ConclaveClientManager.self) private var conclave
-    @State private var showEndGameSheet = false
-    @State private var selectedWinnerId: UUID?
     @State private var animatingLifePlayerIds: Set<UUID> = []
     @State private var trackingPlayerId: UUID?
-    @State private var poisonCounters: [UUID: Int32] = [:]
     
     // Separate logged-in player from other players
     private var loggedInPlayer: Player? {
@@ -108,30 +105,13 @@ struct OnlineGameView: View {
                 }
             }
         }
-        .sheet(isPresented: $showEndGameSheet) {
-            EndGameSheet(
-                players: conclave.allPlayers,
-                selectedWinnerId: $selectedWinnerId,
-                onConfirm: {
-                    Task {
-                        await endGame()
-                    }
-                }
-            )
-            .presentationDetents([.medium])
-        }
         .sheet(item: $trackingPlayerId) { playerId in
             if let player = conclave.allPlayers.first(where: { $0.id == playerId }) {
                 PlayerTrackingPanel(
                     player: player,
                     colorIndex: playerColorIndex(for: player),
-                    poisonCount: poisonCounters[playerId] ?? 0,
                     hasPartner: conclave.hasPartner(playerId: playerId),
                     otherPlayers: conclave.allPlayers.filter { $0.id != playerId },
-                    onPoisonChange: { amount in
-                        let current = poisonCounters[playerId] ?? 0
-                        poisonCounters[playerId] = max(0, current + amount)
-                    },
                     onTogglePartner: {
                         Task {
                             await togglePartner(playerId: playerId)
@@ -226,32 +206,6 @@ struct OnlineGameView: View {
             .buttonStyle(ConclaveIconButtonStyle())
             .disabled(!conclave.isConnectedToWebSocket)
             .opacity(conclave.isConnectedToWebSocket ? 1 : 0.5)
-            
-            // End game button
-            Button(action: {
-                showEndGameSheet = true
-            }) {
-                HStack(spacing: 4) {
-                    Image(systemName: "power")
-                        .font(.system(size: 12, weight: .semibold))
-                    Text("End")
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                }
-                .foregroundColor(.conclaveDanger)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(Color.conclaveDanger.opacity(0.15))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(Color.conclaveDanger.opacity(0.3), lineWidth: 1)
-                )
-            }
-            .disabled(!conclave.isConnectedToWebSocket || conclave.currentGame?.status == .finished)
-            .opacity((!conclave.isConnectedToWebSocket || conclave.currentGame?.status == .finished) ? 0.5 : 1)
             
             // Settings button
             Button(action: {
@@ -350,15 +304,6 @@ struct OnlineGameView: View {
             )
         } catch {
             print("Failed to update commander damage: \(error)")
-        }
-    }
-    
-    private func endGame() async {
-        do {
-            try await conclave.sendEndGame(winnerPlayerId: selectedWinnerId)
-            showEndGameSheet = false
-        } catch {
-            print("Failed to end game: \(error)")
         }
     }
 }
@@ -564,10 +509,8 @@ struct PlayerCardRow: View {
 struct PlayerTrackingPanel: View {
     let player: Player
     let colorIndex: Int
-    let poisonCount: Int32
     let hasPartner: Bool
     let otherPlayers: [Player]
-    let onPoisonChange: (Int32) -> Void
     let onTogglePartner: () -> Void
     let onCommanderDamageChange: (UUID, Int32, Int32) -> Void
     let getCommanderDamage: (UUID, Int32) -> Int32
@@ -589,9 +532,6 @@ struct PlayerTrackingPanel: View {
                         // Commander Damage Section (First)
                         commanderDamageSection
                         
-                        // Poison Counter Section (Second)
-                        poisonSection
-                        
                         // Partner Commander Toggle (Last)
                         partnerToggleSection
                     }
@@ -602,6 +542,7 @@ struct PlayerTrackingPanel: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color.conclaveBackground.opacity(0.9), for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") {
@@ -648,91 +589,6 @@ struct PlayerTrackingPanel: View {
             RoundedRectangle(cornerRadius: 16)
                 .stroke(playerColor.border, lineWidth: 1)
         )
-    }
-    
-    private var poisonSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Label("Poison Counters", systemImage: "drop.fill")
-                .font(.headline)
-                .foregroundColor(.purple)
-            
-            HStack(spacing: 20) {
-                Button(action: { onPoisonChange(-1) }) {
-                    Image(systemName: "minus")
-                        .font(.title2)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.purple)
-                        .frame(width: 56, height: 56)
-                        .background(
-                            Circle()
-                                .fill(Color.purple.opacity(0.18))
-                        )
-                        .overlay(
-                            Circle()
-                                .stroke(Color.purple.opacity(0.3), lineWidth: 1)
-                        )
-                }
-                .disabled(poisonCount <= 0)
-                .opacity(poisonCount <= 0 ? 0.4 : 1)
-                
-                VStack(spacing: 4) {
-                    Text("\(poisonCount)")
-                        .font(.system(size: 48, weight: .bold, design: .rounded))
-                        .foregroundColor(poisonColor)
-                    Text("poison")
-                        .font(.caption)
-                        .foregroundColor(.conclaveMuted)
-                }
-                .frame(minWidth: 80)
-                
-                Button(action: { onPoisonChange(1) }) {
-                    Image(systemName: "plus")
-                        .font(.title2)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.purple)
-                        .frame(width: 56, height: 56)
-                        .background(
-                            Circle()
-                                .fill(Color.purple.opacity(0.18))
-                        )
-                        .overlay(
-                            Circle()
-                                .stroke(Color.purple.opacity(0.3), lineWidth: 1)
-                        )
-                }
-            }
-            .frame(maxWidth: .infinity)
-            
-            if poisonCount >= 10 {
-                HStack {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                    Text("Lethal poison!")
-                }
-                .font(.caption)
-                .foregroundColor(.conclaveDanger)
-                .frame(maxWidth: .infinity)
-            }
-        }
-        .padding(20)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color.purple.opacity(0.08))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.purple.opacity(0.25), lineWidth: 1)
-        )
-    }
-    
-    private var poisonColor: Color {
-        if poisonCount >= 10 {
-            return .conclaveDanger
-        } else if poisonCount >= 7 {
-            return .orange
-        } else if poisonCount > 0 {
-            return .purple
-        }
-        return .white
     }
     
     private var commanderDamageSection: some View {
@@ -917,138 +773,6 @@ struct CommanderDamageCard: View {
             return .orange
         }
         return .white
-    }
-}
-
-// MARK: - End Game Sheet
-
-struct EndGameSheet: View {
-    let players: [Player]
-    @Binding var selectedWinnerId: UUID?
-    let onConfirm: () -> Void
-    @Environment(\.dismiss) private var dismiss
-    
-    var body: some View {
-        NavigationView {
-            ZStack {
-                ConclaveGradientBackground()
-                
-                VStack(spacing: 16) {
-                    Text("Select the winner of this game, or choose \"No winner\" if the game was not completed.")
-                        .font(.subheadline)
-                        .foregroundColor(.conclaveMuted)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
-                        .padding(.top)
-                    
-                    ScrollView {
-                        VStack(spacing: 8) {
-                            // No winner option
-                            Button(action: {
-                                selectedWinnerId = nil
-                            }) {
-                                HStack {
-                                    Image(systemName: selectedWinnerId == nil ? "checkmark.circle.fill" : "circle")
-                                        .foregroundColor(selectedWinnerId == nil ? .conclaveViolet : .conclaveMuted)
-                                    Text("No winner (game not completed)")
-                                        .foregroundColor(.white)
-                                    Spacer()
-                                }
-                                .padding()
-                                .background(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .fill(selectedWinnerId == nil ? Color.conclaveViolet.opacity(0.15) : Color.white.opacity(0.05))
-                                )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .stroke(selectedWinnerId == nil ? Color.conclaveViolet.opacity(0.5) : Color.white.opacity(0.1), lineWidth: selectedWinnerId == nil ? 2 : 1)
-                                )
-                            }
-                            .buttonStyle(.plain)
-                            
-                            // Player options
-                            ForEach(players, id: \.id) { player in
-                                Button(action: {
-                                    selectedWinnerId = player.id
-                                }) {
-                                    HStack {
-                                        Image(systemName: selectedWinnerId == player.id ? "checkmark.circle.fill" : "circle")
-                                            .foregroundColor(selectedWinnerId == player.id ? .conclaveViolet : .conclaveMuted)
-                                        
-                                        if let imageUrl = player.imageUrl, let url = URL(string: imageUrl) {
-                                            AsyncImage(url: url) { image in
-                                                image
-                                                    .resizable()
-                                                    .aspectRatio(contentMode: .fill)
-                                            } placeholder: {
-                                                Circle()
-                                                    .fill(Color.white.opacity(0.1))
-                                            }
-                                            .frame(width: 24, height: 24)
-                                            .clipShape(Circle())
-                                        }
-                                        
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text("P\(player.position): \(player.displayName)")
-                                                .foregroundColor(.white)
-                                            Text("\(player.currentLife) life")
-                                                .font(.caption)
-                                                .foregroundColor(.conclaveMuted)
-                                        }
-                                        
-                                        Spacer()
-                                    }
-                                    .padding()
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .fill(selectedWinnerId == player.id ? Color.conclaveViolet.opacity(0.15) : Color.white.opacity(0.05))
-                                    )
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .stroke(selectedWinnerId == player.id ? Color.conclaveViolet.opacity(0.5) : Color.white.opacity(0.1), lineWidth: selectedWinnerId == player.id ? 2 : 1)
-                                    )
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                        .padding(.horizontal)
-                    }
-                    
-                    HStack(spacing: 12) {
-                        Button("Cancel") {
-                            dismiss()
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(Color.white.opacity(0.08))
-                        )
-                        .foregroundColor(.white)
-                        
-                        Button(action: {
-                            onConfirm()
-                        }) {
-                            Text("End Game")
-                                .fontWeight(.semibold)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(Color.conclaveDanger)
-                        )
-                        .foregroundColor(.white)
-                    }
-                    .padding(.horizontal)
-                    .padding(.bottom)
-                }
-            }
-            .navigationTitle("End Game")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(Color.conclaveBackground.opacity(0.9), for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-        }
     }
 }
 
