@@ -332,16 +332,9 @@ export function GamePageClient({ gameId }: GamePageClientProps) {
     return (
         <div className="min-h-screen bg-gradient-mesh">
             {/* Header Bar */}
-            <div className="glass border-b border-white/10 sticky top-0 z-50">
+            <div className="glass border-b border-white/10">
                 <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <Link
-                            href="/"
-                            className="p-2 rounded-lg hover:bg-white/10 transition-colors"
-                            title="Back to Dashboard"
-                        >
-                            <Home className="w-5 h-5" />
-                        </Link>
                         <div>
                             <h1 className="text-lg font-bold flex items-center gap-2">
                                 Game #{gameId.slice(0, 8)}
@@ -428,8 +421,8 @@ export function GamePageClient({ gameId }: GamePageClientProps) {
                         "grid-cols-1",
                         sortedPlayers.length === 1 && "max-w-lg mx-auto",
                         sortedPlayers.length === 2 && "md:grid-cols-2 max-w-4xl mx-auto",
-                        sortedPlayers.length === 3 && "md:grid-cols-2 lg:grid-cols-3",
-                        sortedPlayers.length === 4 && "md:grid-cols-2 lg:grid-cols-4",
+                        sortedPlayers.length === 3 && "md:grid-cols-2 xl:grid-cols-3",
+                        sortedPlayers.length === 4 && "md:grid-cols-2 xl:grid-cols-4",
                         sortedPlayers.length >= 5 && "md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
                     )}>
                         {sortedPlayers.map((player, index) => {
@@ -496,31 +489,31 @@ export function GamePageClient({ gameId }: GamePageClientProps) {
                                     </div>
 
                                     {/* Life Counter Section */}
-                                    <div className="p-4 md:p-6">
-                                        <div className="flex items-center justify-between gap-4">
+                                    <div className="p-3 md:p-4 lg:p-6">
+                                        <div className="flex items-center justify-between gap-2 md:gap-4">
                                             {/* Decrease Buttons */}
-                                            <div className="flex flex-col gap-2">
+                                            <div className="flex flex-col gap-1.5 md:gap-2 shrink-0">
                                                 <button
                                                     onClick={() => changeLife(player.id, -1)}
                                                     disabled={!isConnected}
-                                                    className="life-button life-button-decrease w-12 h-12 md:w-14 md:h-14 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-lg flex items-center justify-center disabled:opacity-50 transition-all"
+                                                    className="life-button life-button-decrease w-10 h-10 md:w-12 md:h-12 lg:w-14 lg:h-14 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-lg flex items-center justify-center disabled:opacity-50 transition-all"
                                                 >
-                                                    <ChevronDown className="w-6 h-6" />
+                                                    <ChevronDown className="w-5 h-5 md:w-6 md:h-6" />
                                                 </button>
                                                 <button
                                                     onClick={() => changeLife(player.id, -5)}
                                                     disabled={!isConnected}
-                                                    className="life-button life-button-decrease w-12 h-12 md:w-14 md:h-14 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400/80 font-semibold flex items-center justify-center disabled:opacity-50 transition-all"
+                                                    className="life-button life-button-decrease w-10 h-10 md:w-12 md:h-12 lg:w-14 lg:h-14 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400/80 font-semibold text-sm md:text-base flex items-center justify-center disabled:opacity-50 transition-all"
                                                 >
                                                     -5
                                                 </button>
                                             </div>
 
                                             {/* Life Total */}
-                                            <div className="flex-1 text-center">
+                                            <div className="flex-1 text-center min-w-0">
                                                 <div
                                                     className={cn(
-                                                        "text-6xl md:text-7xl lg:text-8xl font-black tabular-nums transition-all",
+                                                        "text-5xl md:text-6xl lg:text-7xl font-black tabular-nums transition-all",
                                                         isAnimating && "animate-counter-bump",
                                                         isCritical && "text-red-400",
                                                         isDanger && !isCritical && "text-amber-400"
@@ -528,7 +521,7 @@ export function GamePageClient({ gameId }: GamePageClientProps) {
                                                 >
                                                     {player.currentLife}
                                                 </div>
-                                                <div className="text-sm text-muted-foreground mt-1 flex items-center justify-center gap-3">
+                                                <div className="text-xs md:text-sm text-muted-foreground mt-1 flex items-center justify-center gap-2 md:gap-3">
                                                     <span>Life</span>
                                                     {totalCmdDamage > 0 && (
                                                         <span className="flex items-center gap-1 text-orange-400">
@@ -540,18 +533,18 @@ export function GamePageClient({ gameId }: GamePageClientProps) {
                                             </div>
 
                                             {/* Increase Buttons */}
-                                            <div className="flex flex-col gap-2">
+                                            <div className="flex flex-col gap-1.5 md:gap-2 shrink-0">
                                                 <button
                                                     onClick={() => changeLife(player.id, +1)}
                                                     disabled={!isConnected}
-                                                    className="life-button life-button-increase w-12 h-12 md:w-14 md:h-14 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 font-bold text-lg flex items-center justify-center disabled:opacity-50 transition-all"
+                                                    className="life-button life-button-increase w-10 h-10 md:w-12 md:h-12 lg:w-14 lg:h-14 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 font-bold text-lg flex items-center justify-center disabled:opacity-50 transition-all"
                                                 >
-                                                    <ChevronUp className="w-6 h-6" />
+                                                    <ChevronUp className="w-5 h-5 md:w-6 md:h-6" />
                                                 </button>
                                                 <button
                                                     onClick={() => changeLife(player.id, +5)}
                                                     disabled={!isConnected}
-                                                    className="life-button life-button-increase w-12 h-12 md:w-14 md:h-14 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400/80 font-semibold flex items-center justify-center disabled:opacity-50 transition-all"
+                                                    className="life-button life-button-increase w-10 h-10 md:w-12 md:h-12 lg:w-14 lg:h-14 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400/80 font-semibold text-sm md:text-base flex items-center justify-center disabled:opacity-50 transition-all"
                                                 >
                                                     +5
                                                 </button>
