@@ -109,6 +109,34 @@ public class ConclaveClientManager {
         }
     }
 
+    /// Fetches the user's active games from the backend and updates local state.
+    /// This is the source of truth for whether the user has an active game.
+    public func fetchUserActiveGame() async throws {
+        setLoading(true)
+        clearError()
+
+        do {
+            let userGames = try await client.getUserGames()
+            // Find the first active game the user is in
+            let activeGame = userGames.first { $0.game.status == .active }
+            
+            if let activeGame = activeGame {
+                // User has an active game - load it
+                currentGame = activeGame.game
+            } else {
+                // User has no active game - clear local state
+                currentGame = nil
+                currentPlayer = nil
+            }
+            
+            setLoading(false)
+        } catch {
+            handleError(error)
+            setLoading(false)
+            throw error
+        }
+    }
+
     public func createGame(
         startingLife: Int32? = nil
     ) async throws -> Game {
