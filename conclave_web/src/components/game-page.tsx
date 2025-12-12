@@ -335,13 +335,6 @@ export function GamePageClient({ gameId }: GamePageClientProps) {
             <div className="glass border-b border-white/10">
                 <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <Link
-                            href="/"
-                            className="p-2 rounded-lg hover:bg-white/10 transition-colors"
-                            title="Back to Dashboard"
-                        >
-                            <Home className="w-5 h-5" />
-                        </Link>
                         <div>
                             <h1 className="text-lg font-bold flex items-center gap-2">
                                 Game #{gameId.slice(0, 8)}
