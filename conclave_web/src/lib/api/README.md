@@ -58,8 +58,14 @@ console.log('Winner:', result.winner);
 ### WebSocket Real-time Updates
 
 ```typescript
-// Connect to game WebSocket
-const ws = api.connectWebSocket(gameId, clerkUserId);
+// Connect to game WebSocket with a token getter function
+// The token getter is called on initial connection AND on each reconnection
+// to ensure fresh tokens for long-lived connections
+const ws = api.connectWebSocket(gameId, async () => {
+  const token = await getAuth().getToken();
+  if (!token) throw new Error('Not authenticated');
+  return token;
+});
 
 // Listen for all messages
 ws.on('*', (message) => {
@@ -81,7 +87,6 @@ ws.on('playerJoined', (message) => {
 
 // Send WebSocket commands
 ws.updateLife(playerId, -2);
-ws.joinGame(clerkUserId);
 ws.getGameState();
 ws.endGame();
 
@@ -97,9 +102,18 @@ api.disconnectWebSocket();
 import { useConclave } from '@/lib/api/hooks';
 
 function GameComponent() {
+  const { getToken } = useAuth();
+  
+  // Create a stable token getter function
+  const tokenGetter = useCallback(async () => {
+    const token = await getToken();
+    if (!token) throw new Error('Not authenticated');
+    return token;
+  }, [getToken]);
+  
   const { api, isConnected, gameState, lastMessage, error } = useConclave({
     gameId: 'game-uuid',
-    clerkUserId: 'user_123',
+    getToken: tokenGetter,
     autoConnect: true, // Auto-connect WebSocket
   });
 
@@ -223,11 +237,14 @@ ws.onError((error) => {
 
 ## Auto-reconnection
 
-The WebSocket client automatically attempts to reconnect on disconnect:
+The WebSocket client automatically attempts to reconnect on disconnect using exponential backoff with jitter:
 
-- Default reconnect interval: 3 seconds
-- Maximum reconnect attempts: 10
-- Queues messages while disconnected
+- **Exponential backoff**: Delays increase exponentially (1s, 2s, 4s, 8s, 16s, 30s, 30s, ...)
+- **Jitter**: Random delay added (0-50% of current delay) to prevent thundering herd
+- **Max interval**: Capped at 30 seconds
+- **Unlimited retries**: Will keep attempting to reconnect indefinitely
+- **Token refresh**: Fetches a fresh JWT token before each reconnection attempt
+- **Message queuing**: Messages are queued while disconnected and sent on reconnect
 
 Configure reconnection:
 
@@ -235,8 +252,8 @@ Configure reconnection:
 const ws = new WebSocketClient({
   url: wsUrl,
   gameId,
-  clerkUserId,
-  reconnectInterval: 5000,      // 5 seconds
-  maxReconnectAttempts: 20,     // 20 attempts
+  getToken: async () => fetchFreshToken(),
+  baseReconnectInterval: 1000,  // 1 second (default)
+  maxReconnectInterval: 30000,  // 30 seconds (default)
 });
 ```

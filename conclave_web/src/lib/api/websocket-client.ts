@@ -7,15 +7,29 @@ export type ErrorEventHandler = (error: Error) => void;
 export interface WebSocketClientConfig {
   url: string;
   gameId: string;
-  /** JWT token for authentication */
-  token: string;
-  reconnectInterval?: number;
-  maxReconnectAttempts?: number;
+  /**
+   * Function to get a fresh JWT token. Called on initial connection and before each reconnection
+   * to ensure the token is valid for long-lived connections.
+   */
+  getToken: () => Promise<string>;
+  /** Base interval for reconnection attempts (default: 1000ms) */
+  baseReconnectInterval?: number;
+  /** Maximum reconnect interval after exponential backoff (default: 30000ms) */
+  maxReconnectInterval?: number;
+}
+
+interface ResolvedWebSocketClientConfig {
+  url: string;
+  gameId: string;
+  getToken: () => Promise<string>;
+  baseReconnectInterval: number;
+  maxReconnectInterval: number;
 }
 
 export class WebSocketClient {
   private ws: WebSocket | null = null;
-  private config: Required<WebSocketClientConfig>;
+  private config: ResolvedWebSocketClientConfig;
+  private currentToken: string | null = null;
   private eventHandlers: Map<string, Set<WebSocketEventHandler>> = new Map();
   private connectionHandlers: Set<ConnectionEventHandler> = new Set();
   private disconnectionHandlers: Set<ConnectionEventHandler> = new Set();
@@ -27,29 +41,45 @@ export class WebSocketClient {
 
   constructor(config: WebSocketClientConfig) {
     this.config = {
-      reconnectInterval: 3000,
-      maxReconnectAttempts: 10,
-      ...config,
+      url: config.url,
+      gameId: config.gameId,
+      getToken: config.getToken,
+      baseReconnectInterval: config.baseReconnectInterval ?? 1000,
+      maxReconnectInterval: config.maxReconnectInterval ?? 30000,
     };
   }
 
   connect(): void {
-    if (this.ws?.readyState === WebSocket.OPEN) {
+    if (
+      this.ws?.readyState === WebSocket.OPEN ||
+      this.ws?.readyState === WebSocket.CONNECTING
+    ) {
       return;
     }
 
     this.isIntentionallyClosed = false;
-    const wsUrl = new URL(this.config.url);
-    // Server expects camelCase query params per serde rename_all = "camelCase"
-    wsUrl.searchParams.set("gameId", this.config.gameId);
-    // Pass JWT token for authentication instead of clerkUserId
-    wsUrl.searchParams.set("token", this.config.token);
+    this.doConnect();
+  }
 
+  private async doConnect(): Promise<void> {
     try {
+      // Fetch a fresh token before each connection attempt
+      this.currentToken = await this.config.getToken();
+
+      const wsUrl = new URL(this.config.url);
+      // Server expects camelCase query params per serde rename_all = "camelCase"
+      wsUrl.searchParams.set("gameId", this.config.gameId);
+      // Pass JWT token for authentication
+      wsUrl.searchParams.set("token", this.currentToken);
+
       this.ws = new WebSocket(wsUrl.toString());
       this.setupEventListeners();
     } catch (error) {
       this.handleError(error as Error);
+      // If token fetch failed, schedule a reconnect
+      if (!this.isIntentionallyClosed) {
+        this.scheduleReconnect();
+      }
     }
   }
 
@@ -79,13 +109,14 @@ export class WebSocketClient {
       this.disconnectionHandlers.forEach((handler) => handler());
 
       if (!this.isIntentionallyClosed) {
-        this.attemptReconnect();
+        this.scheduleReconnect();
       }
     };
 
     this.ws.onerror = (event) => {
       console.error("WebSocket error:", event);
-      this.handleError(new Error("WebSocket connection error"));
+      // Avoid surfacing generic socket errors to UI; reconnection (or visibility resume)
+      // is handled via onclose/attemptReconnect.
     };
   }
 
@@ -109,21 +140,40 @@ export class WebSocketClient {
     this.errorHandlers.forEach((handler) => handler(error));
   }
 
-  private attemptReconnect(): void {
-    if (this.reconnectAttempts >= this.config.maxReconnectAttempts) {
-      console.error("Max reconnection attempts reached");
-      this.handleError(new Error("Failed to reconnect to WebSocket"));
-      return;
+  /**
+   * Calculate the next reconnect delay using exponential backoff with jitter.
+   * Formula: min(maxInterval, baseInterval * 2^attempts) + random jitter
+   */
+  private calculateReconnectDelay(): number {
+    const { baseReconnectInterval, maxReconnectInterval } = this.config;
+
+    // Exponential backoff: base * 2^attempts
+    const exponentialDelay = baseReconnectInterval * Math.pow(2, this.reconnectAttempts);
+
+    // Cap at max interval
+    const cappedDelay = Math.min(exponentialDelay, maxReconnectInterval);
+
+    // Add jitter: random value between 0 and 50% of the delay
+    const jitter = Math.random() * cappedDelay * 0.5;
+
+    return cappedDelay + jitter;
+  }
+
+  private scheduleReconnect(): void {
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
     }
 
+    const delay = this.calculateReconnectDelay();
     this.reconnectAttempts++;
+
     console.log(
-      `Attempting to reconnect (${this.reconnectAttempts}/${this.config.maxReconnectAttempts})...`
+      `Scheduling reconnect attempt ${this.reconnectAttempts} in ${Math.round(delay)}ms...`
     );
 
     this.reconnectTimeout = setTimeout(() => {
-      this.connect();
-    }, this.config.reconnectInterval);
+      this.doConnect();
+    }, delay);
   }
 
   private flushMessageQueue(): void {
@@ -147,6 +197,8 @@ export class WebSocketClient {
       this.ws.close();
       this.ws = null;
     }
+
+    this.reconnectAttempts = 0;
   }
 
   send(request: WebSocketRequest): void {

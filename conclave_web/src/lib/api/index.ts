@@ -33,9 +33,9 @@ export class ConclaveAPI {
   /**
    * Connect to WebSocket for real-time game updates
    * @param gameId - The game ID to connect to
-   * @param token - JWT token for authentication
+   * @param getToken - Function to get a fresh JWT token (called on connect and reconnect)
    */
-  connectWebSocket(gameId: string, token: string): WebSocketClient {
+  connectWebSocket(gameId: string, getToken: () => Promise<string>): WebSocketClient {
     if (this.wsClient) {
       this.wsClient.disconnect();
     }
@@ -58,7 +58,7 @@ export class ConclaveAPI {
     this.wsClient = new WebSocketClient({
       url: wsUrl,
       gameId,
-      token,
+      getToken,
     });
 
     this.wsClient.connect();
