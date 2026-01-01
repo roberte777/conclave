@@ -8,12 +8,20 @@ use crate::{
 };
 use axum::{
     Json,
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
 };
+use serde::Deserialize;
 use sqlx::Row;
 use tracing::{debug, info};
 use uuid::Uuid;
+
+#[derive(Debug, Deserialize)]
+pub struct HistoryQueryParams {
+    /// Include games that finished without a winner (default: false)
+    #[serde(default)]
+    pub include_no_winner: bool,
+}
 
 // User operations are handled by Clerk, so no local user endpoints needed
 
@@ -246,24 +254,32 @@ pub async fn end_game(
 
 pub async fn get_user_history(
     State(state): State<AppState>,
+    Query(params): Query<HistoryQueryParams>,
     auth: AuthenticatedUser,
 ) -> Result<Json<GameHistory>> {
     debug!(
-        "GET /api/v1/users/me/history - Getting game history for user {}",
-        auth.clerk_user_id
+        "GET /api/v1/users/me/history - Getting game history for user {} (include_no_winner: {})",
+        auth.clerk_user_id, params.include_no_winner
     );
-    let history = database::get_user_game_history(&state.db, &auth.clerk_user_id, None).await?;
+    let history = database::get_user_game_history(
+        &state.db,
+        &auth.clerk_user_id,
+        None,
+        params.include_no_winner,
+    )
+    .await?;
     Ok(Json(history))
 }
 
 pub async fn get_user_history_with_pod(
     State(state): State<AppState>,
     Path(pod_filter): Path<String>, // comma-separated clerk_user_ids
+    Query(params): Query<HistoryQueryParams>,
     auth: AuthenticatedUser,
 ) -> Result<Json<GameHistory>> {
     debug!(
-        "GET /api/v1/users/me/history/pod/{} - Getting pod game history for user {}",
-        pod_filter, auth.clerk_user_id
+        "GET /api/v1/users/me/history/pod/{} - Getting pod game history for user {} (include_no_winner: {})",
+        pod_filter, auth.clerk_user_id, params.include_no_winner
     );
 
     // Parse the comma-separated user IDs
@@ -285,8 +301,13 @@ pub async fn get_user_history_with_pod(
         full_pod.push(auth.clerk_user_id.clone());
     }
 
-    let history =
-        database::get_user_game_history(&state.db, &auth.clerk_user_id, Some(full_pod)).await?;
+    let history = database::get_user_game_history(
+        &state.db,
+        &auth.clerk_user_id,
+        Some(full_pod),
+        params.include_no_winner,
+    )
+    .await?;
     Ok(Json(history))
 }
 

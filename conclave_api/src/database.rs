@@ -525,18 +525,27 @@ pub async fn get_user_game_history(
     pool: &SqlitePool,
     clerk_user_id: &str,
     pod_filter: Option<Vec<String>>,
+    include_no_winner: bool,
 ) -> Result<GameHistory> {
+    // By default, exclude games without a winner (incomplete games)
+    let winner_filter = if include_no_winner {
+        ""
+    } else {
+        " AND g.winner_player_id IS NOT NULL"
+    };
+
     // If pod_filter is provided, we need to find games where ALL the specified users participated
     let rows = if let Some(ref pod_users) = pod_filter {
         // Build a query that finds games where all specified users are players
         // This ensures we only return games where the entire "pod" played together
-        let mut query = String::from(
+        let mut query = format!(
             r#"
             SELECT DISTINCT g.*
             FROM games g
             INNER JOIN players p ON g.id = p.game_id
-            WHERE p.clerk_user_id = ? AND g.status = 'finished'
+            WHERE p.clerk_user_id = ? AND g.status = 'finished'{}
             "#,
+            winner_filter
         );
 
         // For each additional user in the pod, ensure they were also in the game
@@ -556,18 +565,20 @@ pub async fn get_user_game_history(
         sql_query.fetch_all(pool).await?
     } else {
         // No pod filter - return all games for this user
-        sqlx::query(
+        let query = format!(
             r#"
             SELECT DISTINCT g.*
             FROM games g
             INNER JOIN players p ON g.id = p.game_id
-            WHERE p.clerk_user_id = ? AND g.status = 'finished'
+            WHERE p.clerk_user_id = ? AND g.status = 'finished'{}
             ORDER BY g.finished_at DESC
             "#,
-        )
-        .bind(clerk_user_id)
-        .fetch_all(pool)
-        .await?
+            winner_filter
+        );
+        sqlx::query(&query)
+            .bind(clerk_user_id)
+            .fetch_all(pool)
+            .await?
     };
 
     let mut games = Vec::new();
